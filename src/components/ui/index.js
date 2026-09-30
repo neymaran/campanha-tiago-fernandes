@@ -13,3 +13,4 @@ export { default as EmptyState } from './EmptyState';
 export { default as PageHeader } from './PageHeader';
 export { default as Card } from './Card';
 export { default as StatsCard } from './StatsCard';
+export { default as Skeleton } from './Skeleton';

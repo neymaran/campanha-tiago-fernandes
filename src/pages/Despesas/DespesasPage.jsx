@@ -24,11 +24,13 @@ export default function DespesasPage() {
   const [formData, setFormData] = useState({
     cpfCnpj: '', nomeFornecedor: '', dataContratacao: '', itens: [], pagamentos: [], comprovantes: []
   });
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const qDespesas = query(collection(db, 'despesas'));
     const unsubDespesas = onSnapshot(qDespesas, (snapshot) => {
       setDespesas(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      setIsLoading(false);
     });
 
     const qContas = query(collection(db, 'contas'));
@@ -393,6 +395,7 @@ export default function DespesasPage() {
               { key: 'actions', label: 'Ações' }
             ]} 
             data={dataWithActions} 
+            isLoading={isLoading}
           />
         </>
       )}

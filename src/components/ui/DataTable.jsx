@@ -1,7 +1,8 @@
 import React, { useState, useMemo } from 'react';
+import Skeleton from './Skeleton';
 import './DataTable.css';
 
-const DataTable = ({ columns, data, emptyMessage = 'No data found' }) => {
+const DataTable = ({ columns, data, emptyMessage = 'No data found', isLoading = false }) => {
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
   const [searchTerm, setSearchTerm] = useState('');
   const [itemsPerPage, setItemsPerPage] = useState(10);
@@ -79,7 +80,17 @@ const DataTable = ({ columns, data, emptyMessage = 'No data found' }) => {
             </tr>
           </thead>
           <tbody>
-            {paginatedData.length > 0 ? (
+            {isLoading ? (
+              Array.from({ length: 5 }).map((_, rowIdx) => (
+                <tr key={`skeleton-${rowIdx}`}>
+                  {columns.map((col, colIdx) => (
+                    <td key={`skel-col-${colIdx}`} data-label={col.label}>
+                      <Skeleton width="80%" height="20px" />
+                    </td>
+                  ))}
+                </tr>
+              ))
+            ) : paginatedData.length > 0 ? (
               paginatedData.map((row, rowIdx) => (
                 <tr key={rowIdx}>
                   {columns.map((col, colIdx) => (

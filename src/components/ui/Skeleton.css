@@ -1,0 +1,28 @@
+.skeleton-shimmer {
+  display: inline-block;
+  background: #e2e8f0;
+  background-image: linear-gradient(
+    to right,
+    #e2e8f0 0%,
+    #cbd5e1 20%,
+    #e2e8f0 40%,
+    #e2e8f0 100%
+  );
+  background-repeat: no-repeat;
+  background-size: 800px 100%;
+  animation-duration: 1.5s;
+  animation-fill-mode: forwards;
+  animation-iteration-count: infinite;
+  animation-name: placeholderShimmer;
+  animation-timing-function: linear;
+  border-radius: 4px;
+}
+
+@keyframes placeholderShimmer {
+  0% {
+    background-position: -400px 0;
+  }
+  100% {
+    background-position: 400px 0;
+  }
+}

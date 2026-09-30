@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { PageHeader, Button, Card, Input, Select, Badge, ConfirmDialog, EmptyState } from '../../components/ui';
+import { PageHeader, Button, Card, Input, Select, Badge, ConfirmDialog, EmptyState, Skeleton } from '../../components/ui';
 import { useToast } from '../../components/ui/Toast';
 import { collection, query, onSnapshot, doc, addDoc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '../../services/firebase';
@@ -15,6 +15,7 @@ export default function ContasPage() {
   const [formData, setFormData] = useState({
     banco: '', agencia: '', conta: '', tipo: 'Corrente', descricao: '', status: 'ativa'
   });
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const q = query(collection(db, 'contas'));
@@ -24,6 +25,7 @@ export default function ContasPage() {
         ...doc.data()
       }));
       setContas(contasData);
+      setIsLoading(false);
     });
 
     return () => unsubscribe();
@@ -85,7 +87,24 @@ export default function ContasPage() {
         <>
           <PageHeader title="Contas Bancárias" actions={<Button onClick={() => handleOpenForm()}>Nova Conta</Button>} />
 
-          {contas.length === 0 ? (
+          {isLoading ? (
+            <div className="contas-grid">
+              {Array.from({ length: 3 }).map((_, idx) => (
+                <Card key={`skel-${idx}`} className="conta-card">
+                  <div style={{ padding: '20px' }}>
+                    <Skeleton height="24px" width="60%" />
+                    <Skeleton height="16px" width="100%" />
+                    <Skeleton height="16px" width="80%" />
+                    <Skeleton height="16px" width="90%" />
+                    <div style={{ marginTop: '20px', display: 'flex', gap: '10px' }}>
+                      <Skeleton height="32px" width="80px" />
+                      <Skeleton height="32px" width="80px" />
+                    </div>
+                  </div>
+                </Card>
+              ))}
+            </div>
+          ) : contas.length === 0 ? (
             <EmptyState title="Nenhuma conta cadastrada" description="Adicione uma conta bancária para começar a gerenciar finanças." />
           ) : (
             <div className="contas-grid">

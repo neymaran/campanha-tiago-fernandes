@@ -23,6 +23,7 @@ export default function DoacoesPage() {
     data: '', nomeDoador: '', valor: '', cpf: '', numeroDocumento: '', identidades: []
   });
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const q = query(collection(db, 'doacoes'));
@@ -32,9 +33,11 @@ export default function DoacoesPage() {
         ...doc.data()
       }));
       setDoacoes(data);
+      setIsLoading(false);
     }, (error) => {
       console.error('Error fetching doacoes:', error);
       addToast('Erro ao carregar doações', 'error');
+      setIsLoading(false);
     });
 
     return () => unsubscribe();
@@ -250,7 +253,7 @@ export default function DoacoesPage() {
             <MaskedInput mask="date" placeholder="Data final" />
           </div>
 
-          <DataTable columns={columns} data={dataWithActions} />
+          <DataTable columns={columns} data={dataWithActions} isLoading={isLoading} />
         </>
       )}
 
