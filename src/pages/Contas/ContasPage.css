@@ -1,0 +1,73 @@
+.contas-page {
+  padding: 20px;
+}
+
+.contas-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 20px;
+  margin-top: 20px;
+}
+
+.conta-card {
+  display: flex;
+  flex-direction: column;
+}
+
+.conta-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+  border-bottom: 1px solid #eee;
+  padding-bottom: 10px;
+}
+
+.conta-header h3 {
+  margin: 0;
+  font-size: 18px;
+  color: #2c3e50;
+}
+
+.conta-body {
+  flex-grow: 1;
+}
+
+.conta-body p {
+  margin: 5px 0;
+  font-size: 15px;
+  color: #555;
+}
+
+.conta-desc {
+  margin-top: 10px !important;
+  font-style: italic;
+  color: #7f8c8d !important;
+}
+
+.conta-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 20px;
+  border-top: 1px solid #eee;
+  padding-top: 15px;
+}
+
+.danger-text {
+  color: #e74c3c !important;
+  border-color: #e74c3c !important;
+}
+
+.danger-text:hover {
+  background-color: #fdf0ef !important;
+}
+
+.form-column {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.mt-4 {
+  margin-top: 1rem;
+}

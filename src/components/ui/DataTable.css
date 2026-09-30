@@ -1,0 +1,112 @@
+.datatable-container {
+  background: white;
+  border-radius: var(--radius-md, 8px);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.datatable-toolbar {
+  padding: 1rem;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.datatable-search {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  width: 100%;
+  max-width: 300px;
+  outline: none;
+}
+.datatable-search:focus {
+  border-color: #0D6E3F;
+}
+
+.datatable-wrapper {
+  overflow-x: auto;
+}
+
+.datatable {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.datatable th {
+  background-color: #f9fafb;
+  padding: 0.75rem 1rem;
+  font-weight: 600;
+  color: #374151;
+  font-size: 0.875rem;
+  cursor: pointer;
+  user-select: none;
+  border-bottom: 2px solid #e5e7eb;
+}
+.datatable th:hover {
+  background-color: #f3f4f6;
+}
+.datatable th.active-sort {
+  color: #0D6E3F;
+}
+
+.datatable td {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid #e5e7eb;
+  color: #4b5563;
+  font-size: 0.875rem;
+}
+
+.datatable tbody tr:hover {
+  background-color: #f9fafb;
+}
+
+.datatable tbody tr:nth-child(even) {
+  background-color: #fcfcfc;
+}
+
+.datatable-empty {
+  text-align: center;
+  padding: 3rem !important;
+  color: #6b7280;
+}
+
+.datatable-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem;
+  background-color: white;
+  border-top: 1px solid #e5e7eb;
+  font-size: 0.875rem;
+  color: #374151;
+}
+
+.datatable-page-size select {
+  margin-left: 0.5rem;
+  padding: 0.25rem;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+}
+
+.datatable-pagination {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.datatable-pagination button {
+  padding: 0.25rem 0.75rem;
+  border: 1px solid #d1d5db;
+  background-color: white;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.datatable-pagination button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.datatable-pagination button:hover:not(:disabled) {
+  background-color: #f3f4f6;
+}
