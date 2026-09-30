@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { NavLink, Link, useNavigate, useLocation } from 'react-router-dom';
+import { NavLink, Link, useLocation } from 'react-router-dom';
 import './Navbar.css';
 
 /**
@@ -46,52 +46,14 @@ const NAV_ITEMS = [
         <path d="M16 14v4" />
       </svg>
     )
-  },
-  {
-    path: '/usuarios',
-    label: 'Usuários',
-    badge: null,
-    icon: (
-      <svg className="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-        <circle cx="9" cy="7" r="4" />
-        <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
-        <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-      </svg>
-    )
   }
 ];
 
-const DEFAULT_USER = {
-  name: 'Tiago Fernandes',
-  email: 'financeiro@tiagofernandes.com.br',
-  role: 'Administrador'
-};
-
-const Navbar = ({ user: propUser, onLogout }) => {
+const Navbar = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [currentUser, setCurrentUser] = useState(propUser || DEFAULT_USER);
   const [scrolled, setScrolled] = useState(false);
-  const navigate = useNavigate();
   const location = useLocation();
   const menuRef = useRef(null);
-
-  // Sync user prop or fetch from localStorage
-  useEffect(() => {
-    if (propUser) {
-      setCurrentUser(propUser);
-      return;
-    }
-
-    try {
-      const stored = localStorage.getItem('user');
-      if (stored) {
-        setCurrentUser(JSON.parse(stored));
-      }
-    } catch {
-      setCurrentUser(DEFAULT_USER);
-    }
-  }, [propUser]);
 
   // Handle scroll effect for navbar elevation
   useEffect(() => {
@@ -137,34 +99,9 @@ const Navbar = ({ user: propUser, onLogout }) => {
     };
   }, [isMobileMenuOpen]);
 
-  const handleLogoutClick = () => {
-    setIsMobileMenuOpen(false);
-    try {
-      localStorage.removeItem('user');
-      localStorage.removeItem('token');
-    } catch {
-      // Ignore storage errors
-    }
-
-    if (onLogout) {
-      onLogout();
-    } else {
-      navigate('/login');
-    }
-  };
-
-  const getInitials = (name) => {
-    if (!name) return 'TF';
-    const parts = name.trim().split(' ');
-    if (parts.length >= 2) {
-      return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-    }
-    return name.slice(0, 2).toUpperCase();
-  };
-
   return (
-    <header className={`navbar-header ${scrolled ? 'is-scrolled' : ''}`}>
-      <div className="navbar-container" ref={menuRef}>
+    <header className={`navbar-header ${scrolled ? 'is-scrolled' : ''}`} ref={menuRef}>
+      <div className="navbar-container">
         {/* Brand / Logo */}
         <Link to="/doacoes" className="navbar-brand" aria-label="Ir para a página inicial">
           <div className="brand-logo-badge">
@@ -197,34 +134,6 @@ const Navbar = ({ user: propUser, onLogout }) => {
           </ul>
         </nav>
 
-        {/* Right Section: User Info + Logout */}
-        <div className="navbar-right desktop-right">
-          <div className="user-profile-badge" title={currentUser.email}>
-            <div className="user-avatar" aria-hidden="true">
-              {getInitials(currentUser.name)}
-            </div>
-            <div className="user-info">
-              <span className="user-email">{currentUser.email}</span>
-              <span className="user-role">{currentUser.role || 'Usuário'}</span>
-            </div>
-          </div>
-
-          <button
-            type="button"
-            className="logout-button"
-            onClick={handleLogoutClick}
-            title="Sair do sistema"
-            aria-label="Sair da conta"
-          >
-            <svg className="logout-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-              <polyline points="16 17 21 12 16 7" />
-              <line x1="21" y1="12" x2="9" y2="12" />
-            </svg>
-            <span className="logout-text">Sair</span>
-          </button>
-        </div>
-
         {/* Mobile Hamburger Button */}
         <button
           type="button"
@@ -250,18 +159,6 @@ const Navbar = ({ user: propUser, onLogout }) => {
 
       {/* Mobile Navigation Drawer */}
       <div className={`mobile-nav-drawer ${isMobileMenuOpen ? 'is-open' : ''}`}>
-        <div className="mobile-drawer-header">
-          <div className="user-profile-badge mobile-user-badge">
-            <div className="user-avatar">
-              {getInitials(currentUser.name)}
-            </div>
-            <div className="user-info">
-              <span className="user-name">{currentUser.name || 'Tiago Fernandes'}</span>
-              <span className="user-email">{currentUser.email}</span>
-            </div>
-          </div>
-        </div>
-
         <nav className="mobile-nav-list" aria-label="Navegação móvel">
           {NAV_ITEMS.map((item) => (
             <NavLink
@@ -280,21 +177,6 @@ const Navbar = ({ user: propUser, onLogout }) => {
             </NavLink>
           ))}
         </nav>
-
-        <div className="mobile-drawer-footer">
-          <button
-            type="button"
-            className="mobile-logout-button"
-            onClick={handleLogoutClick}
-          >
-            <svg className="logout-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-              <polyline points="16 17 21 12 16 7" />
-              <line x1="21" y1="12" x2="9" y2="12" />
-            </svg>
-            <span>Sair da conta</span>
-          </button>
-        </div>
       </div>
     </header>
   );

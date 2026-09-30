@@ -1,9 +1,17 @@
 import React, { useRef, useState } from 'react';
 import './FileUpload.css';
 
-const FileUpload = ({ accept, maxFiles, multiple = false, onFilesChange }) => {
+const FileUpload = ({ 
+  accept, 
+  maxFiles, 
+  multiple = false, 
+  onFilesChange, 
+  initialFiles = [],
+  isUploading = false,
+  uploadProgress = 0
+}) => {
   const [dragActive, setDragActive] = useState(false);
-  const [files, setFiles] = useState([]);
+  const [files, setFiles] = useState(initialFiles);
   const inputRef = useRef(null);
 
   const handleDrag = (e) => {
@@ -43,6 +51,7 @@ const FileUpload = ({ accept, maxFiles, multiple = false, onFilesChange }) => {
   };
 
   const removeFile = (idx) => {
+    if (isUploading) return;
     const updated = [...files];
     updated.splice(idx, 1);
     setFiles(updated);
@@ -50,7 +59,7 @@ const FileUpload = ({ accept, maxFiles, multiple = false, onFilesChange }) => {
   };
 
   const formatSize = (bytes) => {
-    if (bytes === 0) return '0 Bytes';
+    if (!bytes || bytes === 0) return '0 Bytes';
     const k = 1024;
     const sizes = ['Bytes', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
@@ -60,12 +69,12 @@ const FileUpload = ({ accept, maxFiles, multiple = false, onFilesChange }) => {
   return (
     <div className="fileupload-container">
       <div 
-        className={`fileupload-dropzone ${dragActive ? 'active' : ''}`}
+        className={`fileupload-dropzone ${dragActive ? 'active' : ''} ${isUploading ? 'uploading' : ''}`}
         onDragEnter={handleDrag}
         onDragLeave={handleDrag}
         onDragOver={handleDrag}
         onDrop={handleDrop}
-        onClick={() => inputRef.current.click()}
+        onClick={() => !isUploading && inputRef.current.click()}
       >
         <input 
           ref={inputRef}
@@ -74,6 +83,7 @@ const FileUpload = ({ accept, maxFiles, multiple = false, onFilesChange }) => {
           accept={accept}
           onChange={handleChange}
           style={{ display: 'none' }}
+          disabled={isUploading}
         />
         <div className="fileupload-icon">
           <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -82,8 +92,23 @@ const FileUpload = ({ accept, maxFiles, multiple = false, onFilesChange }) => {
             <line x1="12" y1="3" x2="12" y2="15" />
           </svg>
         </div>
-        <p className="fileupload-text">Drag & drop files here, or click to browse</p>
+        <p className="fileupload-text">Arraste e solte arquivos aqui, ou clique para buscar</p>
       </div>
+
+      {isUploading && (
+        <div className="upload-progress-wrapper">
+          <div className="upload-progress-info">
+            <span>Enviando arquivos...</span>
+            <span>{uploadProgress > 0 ? `${Math.round(uploadProgress)}%` : 'Iniciando...'}</span>
+          </div>
+          <div className="upload-progress-track">
+            <div 
+              className="upload-progress-bar"
+              style={{ width: `${uploadProgress > 0 ? uploadProgress : 100}%` }}
+            />
+          </div>
+        </div>
+      )}
 
       {files.length > 0 && (
         <ul className="fileupload-list">
@@ -93,7 +118,9 @@ const FileUpload = ({ accept, maxFiles, multiple = false, onFilesChange }) => {
                 <span className="file-name">{file.name}</span>
                 <span className="file-size">{formatSize(file.size)}</span>
               </div>
-              <button className="file-remove" onClick={() => removeFile(idx)}>&times;</button>
+              {!isUploading && (
+                <button className="file-remove" onClick={() => removeFile(idx)}>&times;</button>
+              )}
             </li>
           ))}
         </ul>

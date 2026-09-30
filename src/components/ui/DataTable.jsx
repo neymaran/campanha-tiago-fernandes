@@ -83,7 +83,7 @@ const DataTable = ({ columns, data, emptyMessage = 'No data found' }) => {
               paginatedData.map((row, rowIdx) => (
                 <tr key={rowIdx}>
                   {columns.map((col, colIdx) => (
-                    <td key={colIdx}>
+                    <td key={colIdx} data-label={col.label}>
                       {col.render ? col.render(row) : row[col.key]}
                     </td>
                   ))}

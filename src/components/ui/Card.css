@@ -27,3 +27,17 @@
 .card-pad-sm .card-body { padding: 1rem; }
 .card-pad-md .card-body { padding: 1.5rem; }
 .card-pad-lg .card-body { padding: 2rem; }
+
+/* Responsividade Mobile */
+@media (max-width: 768px) {
+  .card {
+    border-radius: var(--radius-md, 6px);
+  }
+
+  .card-header {
+    padding: 1rem;
+  }
+
+  .card-pad-md .card-body { padding: 1rem; }
+  .card-pad-lg .card-body { padding: 1.25rem; }
+}

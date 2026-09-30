@@ -55,3 +55,21 @@
 .stats-trend-text {
   color: #6b7280;
 }
+
+/* Responsividade Mobile */
+@media (max-width: 768px) {
+  .stats-value {
+    font-size: 1.5rem;
+  }
+
+  .stats-icon-wrapper {
+    width: 40px;
+    height: 40px;
+  }
+}
+
+@media (max-width: 480px) {
+  .stats-value {
+    font-size: 1.25rem;
+  }
+}

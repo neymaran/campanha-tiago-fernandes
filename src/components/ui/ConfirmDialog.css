@@ -47,3 +47,19 @@
 .confirm-actions button {
   min-width: 120px;
 }
+
+/* Responsividade Mobile */
+@media (max-width: 768px) {
+  .confirm-dialog {
+    margin: 16px;
+    max-width: calc(100vw - 32px);
+  }
+
+  .confirm-actions {
+    flex-direction: column-reverse;
+  }
+
+  .confirm-actions button {
+    width: 100%;
+  }
+}

@@ -71,3 +71,28 @@
 .mt-4 {
   margin-top: 1rem;
 }
+
+/* Responsividade Mobile */
+@media (max-width: 768px) {
+  .contas-page {
+    padding: 12px;
+  }
+
+  .contas-grid {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+
+  .conta-header h3 {
+    font-size: 16px;
+  }
+
+  .conta-actions {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .conta-actions button {
+    width: 100%;
+  }
+}

@@ -53,6 +53,16 @@
 .input-field.has-icon {
   padding-left: 2.5rem;
 }
+.input-field.has-end-icon {
+  padding-right: 2.5rem;
+}
+.input-end-icon {
+  position: absolute;
+  right: 0.75rem;
+  color: #6b7280;
+  display: flex;
+  align-items: center;
+}
 textarea.input-field {
   min-height: 80px;
   resize: vertical;

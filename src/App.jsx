@@ -4,25 +4,21 @@ import Layout from './components/layout/Layout';
 import { ToastProvider } from './components/ui/Toast';
 
 // Application Pages
-import LoginPage from './pages/Login/LoginPage';
 import DoacoesPage from './pages/Doacoes/DoacoesPage';
 import DespesasPage from './pages/Despesas/DespesasPage';
 import ContasPage from './pages/Contas/ContasPage';
-import UsuariosPage from './pages/Usuarios/UsuariosPage';
 
 /**
  * Root Application Component
  * Configures React Router v6 routing, layout wrapping, and global toast notifications.
+ * Authentication has been removed.
  */
 function App() {
   return (
     <ToastProvider>
       <BrowserRouter>
         <Routes>
-          {/* Public Route (without Navbar / Layout) */}
-          <Route path="/login" element={<LoginPage />} />
-
-          {/* Authenticated Routes with Top Navigation Layout */}
+          {/* Public Routes with Top Navigation Layout */}
           <Route
             path="/doacoes"
             element={
@@ -44,14 +40,6 @@ function App() {
             element={
               <Layout>
                 <ContasPage />
-              </Layout>
-            }
-          />
-          <Route
-            path="/usuarios"
-            element={
-              <Layout>
-                <UsuariosPage />
               </Layout>
             }
           />

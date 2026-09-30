@@ -1,7 +1,18 @@
 import React, { useState, useRef, useEffect } from 'react';
 import './Select.css';
 
-const Select = ({ options, value, onChange, placeholder = 'Select...', label, error }) => {
+const Select = ({ 
+  options = [], 
+  value, 
+  onChange, 
+  placeholder = 'Selecione...', 
+  label, 
+  error, 
+  name,
+  className = '',
+  disabled = false,
+  ...props 
+}) => {
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const wrapperRef = useRef(null);
@@ -16,18 +27,35 @@ const Select = ({ options, value, onChange, placeholder = 'Select...', label, er
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const filteredOptions = options.filter(opt => 
-    opt.label.toLowerCase().includes(searchTerm.toLowerCase())
+  const safeOptions = Array.isArray(options) ? options : [];
+
+  const filteredOptions = safeOptions.filter(opt => 
+    opt && opt.label && opt.label.toString().toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const selectedOption = options.find(opt => opt.value === value);
+  const selectedOption = safeOptions.find(opt => opt && opt.value === value);
+
+  const handleSelectOption = (optValue, e) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    if (onChange) {
+      const syntheticEvent = {
+        target: { name: name || '', value: optValue }
+      };
+      onChange(syntheticEvent, optValue);
+    }
+    setIsOpen(false);
+    setSearchTerm('');
+  };
 
   return (
-    <div className="select-wrapper" ref={wrapperRef}>
+    <div className={`select-wrapper ${className}`} ref={wrapperRef}>
       {label && <label className="select-label">{label}</label>}
       <div 
-        className={`select-trigger ${error ? 'select-error' : ''} ${isOpen ? 'open' : ''}`}
-        onClick={() => setIsOpen(!isOpen)}
+        className={`select-trigger ${error ? 'select-error' : ''} ${isOpen ? 'open' : ''} ${disabled ? 'disabled' : ''}`}
+        onClick={() => !disabled && setIsOpen(!isOpen)}
       >
         <span>{selectedOption ? selectedOption.label : placeholder}</span>
         <span className="select-arrow">▼</span>
@@ -38,7 +66,7 @@ const Select = ({ options, value, onChange, placeholder = 'Select...', label, er
           <input 
             type="text" 
             className="select-search" 
-            placeholder="Search..."
+            placeholder="Buscar..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             onClick={(e) => e.stopPropagation()}
@@ -50,17 +78,14 @@ const Select = ({ options, value, onChange, placeholder = 'Select...', label, er
                 <li 
                   key={opt.value}
                   className={`select-option ${opt.value === value ? 'selected' : ''}`}
-                  onClick={() => {
-                    onChange(opt.value);
-                    setIsOpen(false);
-                    setSearchTerm('');
-                  }}
+                  onMouseDown={(e) => handleSelectOption(opt.value, e)}
+                  onClick={(e) => handleSelectOption(opt.value, e)}
                 >
                   {opt.label}
                 </li>
               ))
             ) : (
-              <li className="select-no-results">No options found</li>
+              <li className="select-no-results">Nenhuma opção encontrada</li>
             )}
           </ul>
         </div>

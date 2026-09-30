@@ -110,3 +110,96 @@
 .datatable-pagination button:hover:not(:disabled) {
   background-color: #f3f4f6;
 }
+
+/* ==========================================================================
+   Responsividade Mobile - Cards empilhados
+   ========================================================================== */
+@media (max-width: 768px) {
+  .datatable-container {
+    box-shadow: none;
+    background: transparent;
+  }
+
+  .datatable-toolbar {
+    padding: 0 0 12px 0;
+    border-bottom: none;
+  }
+
+  .datatable-search {
+    max-width: 100%;
+    font-size: 16px; /* prevents iOS zoom */
+  }
+
+  .datatable thead {
+    display: none;
+  }
+
+  .datatable,
+  .datatable tbody,
+  .datatable tr,
+  .datatable td {
+    display: block;
+    width: 100%;
+  }
+
+  .datatable tbody tr {
+    background: white;
+    border-radius: 10px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    margin-bottom: 12px;
+    padding: 14px 16px;
+    border: 1px solid #e5e7eb;
+  }
+
+  .datatable tbody tr:nth-child(even) {
+    background-color: white;
+  }
+
+  .datatable tbody tr:hover {
+    background-color: #f8fafc;
+  }
+
+  .datatable td {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 0;
+    border-bottom: 1px solid #f1f5f9;
+    font-size: 0.875rem;
+    text-align: right;
+  }
+
+  .datatable td:last-child {
+    border-bottom: none;
+    padding-top: 10px;
+    justify-content: flex-end;
+  }
+
+  .datatable td::before {
+    content: attr(data-label);
+    font-weight: 600;
+    color: #374151;
+    text-align: left;
+    flex-shrink: 0;
+    margin-right: 12px;
+  }
+
+  .datatable td:last-child::before {
+    display: none;
+  }
+
+  .datatable-footer {
+    flex-direction: column;
+    gap: 12px;
+    align-items: stretch;
+    text-align: center;
+  }
+
+  .datatable-pagination {
+    justify-content: center;
+  }
+
+  .datatable-page-size {
+    text-align: center;
+  }
+}
