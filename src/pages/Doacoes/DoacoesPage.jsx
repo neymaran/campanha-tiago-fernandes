@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   PageHeader, DataTable, Button, Card, Input, MaskedInput, 
-  FileUpload, StatsCard, ConfirmDialog 
+  FileUpload, StatsCard, ConfirmDialog, Badge 
 } from '../../components/ui';
 import { useToast } from '../../components/ui/Toast';
 import { collection, query, onSnapshot, doc, addDoc, updateDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
@@ -51,6 +51,7 @@ export default function DoacoesPage() {
     { key: 'cpf', label: 'CPF' },
     { key: 'valorFormatted', label: 'Valor' },
     { key: 'numeroDocumento', label: 'Nº Documento' },
+    { key: 'anexoBadge', label: 'Anexo' },
     { key: 'actions', label: 'Ações' }
   ];
 
@@ -221,17 +222,25 @@ export default function DoacoesPage() {
     }
   };
 
-  const dataWithActions = doacoes.map(d => ({
-    ...d,
-    valorFormatted: formatCurrency(d.valor),
-    actions: (
-      <div className="action-buttons">
-        <Button variant="icon" onClick={() => { setCurrentDoacao(d); setViewMode('details'); window.scrollTo(0, 0); }}>👁️</Button>
-        <Button variant="icon" onClick={() => handleOpenForm(d)}>✏️</Button>
-        <Button variant="icon" className="danger" onClick={() => { setCurrentDoacao(d); setIsConfirmOpen(true); }}>🗑️</Button>
-      </div>
-    )
-  }));
+  const dataWithActions = doacoes.map(d => {
+    const hasAnexo = Boolean(d.identidades && d.identidades.length > 0);
+    return {
+      ...d,
+      valorFormatted: formatCurrency(d.valor),
+      anexoBadge: (
+        <Badge variant={hasAnexo ? 'info' : 'neutral'} size="sm">
+          {hasAnexo ? '📎 Com anexo' : 'Sem anexo'}
+        </Badge>
+      ),
+      actions: (
+        <div className="action-buttons">
+          <Button variant="icon" onClick={() => { setCurrentDoacao(d); setViewMode('details'); window.scrollTo(0, 0); }}>👁️</Button>
+          <Button variant="icon" onClick={() => handleOpenForm(d)}>✏️</Button>
+          <Button variant="icon" className="danger" onClick={() => { setCurrentDoacao(d); setIsConfirmOpen(true); }}>🗑️</Button>
+        </div>
+      )
+    };
+  });
 
   return (
     <div className="doacoes-page">

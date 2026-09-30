@@ -358,19 +358,27 @@ export default function DespesasPage() {
   const totalGeralPago = despesas.reduce((acc, curr) => acc + curr.totalPago, 0);
   const totalGeralPendente = totalGeral - totalGeralPago;
 
-  const dataWithActions = despesas.map(d => ({
-    ...d,
-    valorTotal: formatCurrency(d.totalDespesa),
-    pagoFormatado: formatCurrency(d.totalPago),
-    statusBadge: <Badge variant={d.status === 'pago' ? 'success' : d.status === 'parcial' ? 'warning' : 'danger'}>{d.status?.toUpperCase()}</Badge>,
-    actions: (
-      <div className="action-buttons">
-        <Button variant="icon" onClick={() => { setCurrentDespesa(d); setViewMode('details'); window.scrollTo(0, 0); }}>👁️</Button>
-        <Button variant="icon" onClick={() => handleOpenForm(d)}>✏️</Button>
-        <Button variant="icon" className="danger" onClick={() => { setCurrentDespesa(d); setIsConfirmOpen(true); }}>🗑️</Button>
-      </div>
-    )
-  }));
+  const dataWithActions = despesas.map(d => {
+    const hasAnexo = Boolean(d.comprovantes && d.comprovantes.length > 0);
+    return {
+      ...d,
+      valorTotal: formatCurrency(d.totalDespesa),
+      pagoFormatado: formatCurrency(d.totalPago),
+      statusBadge: <Badge variant={d.status === 'pago' ? 'success' : d.status === 'parcial' ? 'warning' : 'danger'}>{d.status?.toUpperCase()}</Badge>,
+      anexoBadge: (
+        <Badge variant={hasAnexo ? 'info' : 'neutral'} size="sm">
+          {hasAnexo ? '📎 Com anexo' : 'Sem anexo'}
+        </Badge>
+      ),
+      actions: (
+        <div className="action-buttons">
+          <Button variant="icon" onClick={() => { setCurrentDespesa(d); setViewMode('details'); window.scrollTo(0, 0); }}>👁️</Button>
+          <Button variant="icon" onClick={() => handleOpenForm(d)}>✏️</Button>
+          <Button variant="icon" className="danger" onClick={() => { setCurrentDespesa(d); setIsConfirmOpen(true); }}>🗑️</Button>
+        </div>
+      )
+    };
+  });
 
   return (
     <div className="despesas-page">
@@ -392,6 +400,7 @@ export default function DespesasPage() {
               { key: 'valorTotal', label: 'Valor Total' },
               { key: 'pagoFormatado', label: 'Pago' },
               { key: 'statusBadge', label: 'Status' },
+              { key: 'anexoBadge', label: 'Anexo' },
               { key: 'actions', label: 'Ações' }
             ]} 
             data={dataWithActions} 
