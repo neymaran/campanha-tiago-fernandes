@@ -9,8 +9,8 @@ import { ref, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebas
 import { db, storage } from '../../services/firebase';
 import { validateCPF, validateCNPJ } from '../../utils/formatters';
 import * as XLSX from 'xlsx';
-import jsPDF from 'jspdf';
-import 'jspdf-autotable';
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import './DespesasPage.css';
 
 export default function DespesasPage() {
@@ -563,7 +563,7 @@ export default function DespesasPage() {
 
     tableRows.push(['', '', '', 'TOTAIS:', formatCurrency(totalGeral), formatCurrency(totalGeralPago), '']);
 
-    doc.autoTable({
+    autoTable(doc, {
       head: [tableColumn],
       body: tableRows,
       startY: 35,

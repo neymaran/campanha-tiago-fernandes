@@ -9,8 +9,8 @@ import { ref, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebas
 import { db, storage } from '../../services/firebase';
 import { formatCurrency, parseCurrency, validateCPF } from '../../utils/formatters';
 import * as XLSX from 'xlsx';
-import jsPDF from 'jspdf';
-import 'jspdf-autotable';
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import './DoacoesPage.css';
 
 export default function DoacoesPage() {
@@ -400,7 +400,7 @@ export default function DoacoesPage() {
     const totalFiltrado = filteredDoacoes.reduce((acc, curr) => acc + (curr.valor || 0), 0);
     tableRows.push(['', '', '', 'TOTAL:', formatCurrency(totalFiltrado), '']);
 
-    doc.autoTable({
+    autoTable(doc, {
       head: [tableColumn],
       body: tableRows,
       startY: 35,
