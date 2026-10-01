@@ -2,11 +2,8 @@ import React, { useState, useMemo } from 'react';
 import Skeleton from './Skeleton';
 import './DataTable.css';
 
-const DataTable = ({ columns, data, emptyMessage = 'No data found', isLoading = false }) => {
+const DataTable = ({ columns, data, emptyMessage = 'Nenhum registro encontrado', isLoading = false, onRowClick }) => {
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
-  const [searchTerm, setSearchTerm] = useState('');
-  const [itemsPerPage, setItemsPerPage] = useState(10);
-  const [currentPage, setCurrentPage] = useState(1);
 
   const handleSort = (key) => {
     let direction = 'asc';
@@ -16,16 +13,8 @@ const DataTable = ({ columns, data, emptyMessage = 'No data found', isLoading = 
     setSortConfig({ key, direction });
   };
 
-  const filteredData = useMemo(() => {
-    return data.filter(item => 
-      Object.values(item).some(val => 
-        String(val).toLowerCase().includes(searchTerm.toLowerCase())
-      )
-    );
-  }, [data, searchTerm]);
-
   const sortedData = useMemo(() => {
-    let sortableItems = [...filteredData];
+    let sortableItems = [...data];
     if (sortConfig.key !== null) {
       sortableItems.sort((a, b) => {
         if (a[sortConfig.key] < b[sortConfig.key]) {
@@ -38,27 +27,10 @@ const DataTable = ({ columns, data, emptyMessage = 'No data found', isLoading = 
       });
     }
     return sortableItems;
-  }, [filteredData, sortConfig]);
-
-  const paginatedData = useMemo(() => {
-    const start = (currentPage - 1) * itemsPerPage;
-    return sortedData.slice(start, start + itemsPerPage);
-  }, [sortedData, currentPage, itemsPerPage]);
-
-  const totalPages = Math.ceil(sortedData.length / itemsPerPage);
+  }, [data, sortConfig]);
 
   return (
     <div className="datatable-container">
-      <div className="datatable-toolbar">
-        <input 
-          type="text" 
-          placeholder="Search..." 
-          className="datatable-search"
-          value={searchTerm}
-          onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
-        />
-      </div>
-      
       <div className="datatable-wrapper">
         <table className="datatable">
           <thead>
@@ -90,9 +62,18 @@ const DataTable = ({ columns, data, emptyMessage = 'No data found', isLoading = 
                   ))}
                 </tr>
               ))
-            ) : paginatedData.length > 0 ? (
-              paginatedData.map((row, rowIdx) => (
-                <tr key={rowIdx}>
+            ) : sortedData.length > 0 ? (
+              sortedData.map((row, rowIdx) => (
+                <tr 
+                  key={rowIdx} 
+                  onClick={(e) => {
+                    // Evita disparar clique na linha ao clicar em ações/checkboxes
+                    if (onRowClick && !e.target.closest('.action-buttons') && e.target.tagName !== 'INPUT' && e.target.tagName !== 'BUTTON' && e.target.tagName !== 'A') {
+                      onRowClick(row);
+                    }
+                  }}
+                  style={{ cursor: onRowClick ? 'pointer' : 'default' }}
+                >
                   {columns.map((col, colIdx) => (
                     <td key={colIdx} data-label={col.label}>
                       {col.render ? col.render(row) : row[col.key]}
@@ -111,36 +92,6 @@ const DataTable = ({ columns, data, emptyMessage = 'No data found', isLoading = 
             )}
           </tbody>
         </table>
-      </div>
-
-      <div className="datatable-footer">
-        <div className="datatable-page-size">
-          Rows per page: 
-          <select 
-            value={itemsPerPage} 
-            onChange={(e) => { setItemsPerPage(Number(e.target.value)); setCurrentPage(1); }}
-          >
-            <option value={10}>10</option>
-            <option value={25}>25</option>
-            <option value={50}>50</option>
-          </select>
-        </div>
-        
-        <div className="datatable-pagination">
-          <button 
-            disabled={currentPage === 1} 
-            onClick={() => setCurrentPage(p => p - 1)}
-          >
-            Prev
-          </button>
-          <span>Page {currentPage} of {totalPages || 1}</span>
-          <button 
-            disabled={currentPage === totalPages || totalPages === 0} 
-            onClick={() => setCurrentPage(p => p + 1)}
-          >
-            Next
-          </button>
-        </div>
       </div>
     </div>
   );

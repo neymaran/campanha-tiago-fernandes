@@ -27,7 +27,24 @@ export default function DoacoesPage() {
   });
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
-  const [filtroLancado, setFiltroLancado] = useState('todos');
+  const [filtros, setFiltros] = useState({ busca: '', dataInicio: '', dataFim: '', lancado: 'todos' });
+  const [filtrosAplicados, setFiltrosAplicados] = useState({ busca: '', dataInicio: '', dataFim: '', lancado: 'todos' });
+
+  const copyToClipboard = (text, label) => {
+    if (!text) return;
+    navigator.clipboard.writeText(String(text));
+    addToast(`${label || 'Informação'} copiada!`, 'success');
+  };
+
+  const handleApplyFilters = () => {
+    setFiltrosAplicados({ ...filtros });
+  };
+
+  const handleClearFilters = () => {
+    const empty = { busca: '', dataInicio: '', dataFim: '', lancado: 'todos' };
+    setFiltros(empty);
+    setFiltrosAplicados(empty);
+  };
 
   // Import State
   const [importData, setImportData] = useState([]);
@@ -361,9 +378,37 @@ export default function DoacoesPage() {
     }
   };
 
+  const parseBrDateToTimestamp = (dateStr) => {
+    if (!dateStr || dateStr.length !== 10) return null;
+    const [dd, mm, yyyy] = dateStr.split('/');
+    if (!dd || !mm || !yyyy) return null;
+    return new Date(`${yyyy}-${mm.padStart(2, '0')}-${dd.padStart(2, '0')}T00:00:00`).getTime();
+  };
+
   const filteredDoacoes = doacoes.filter(d => {
-    if (filtroLancado === 'sim') return d.lancado === true;
-    if (filtroLancado === 'nao') return !d.lancado;
+    if (filtrosAplicados.lancado === 'sim' && !d.lancado) return false;
+    if (filtrosAplicados.lancado === 'nao' && d.lancado) return false;
+
+    if (filtrosAplicados.busca) {
+      const q = filtrosAplicados.busca.toLowerCase();
+      const matchNome = (d.nomeDoador || '').toLowerCase().includes(q);
+      const matchCpf = (d.cpf || '').includes(q);
+      const matchDoc = (d.numeroDocumento || '').toLowerCase().includes(q);
+      if (!matchNome && !matchCpf && !matchDoc) return false;
+    }
+
+    if (filtrosAplicados.dataInicio) {
+      const tInicio = parseBrDateToTimestamp(filtrosAplicados.dataInicio);
+      const tItem = parseBrDateToTimestamp(d.data);
+      if (tInicio && tItem && tItem < tInicio) return false;
+    }
+
+    if (filtrosAplicados.dataFim) {
+      const tFim = parseBrDateToTimestamp(filtrosAplicados.dataFim);
+      const tItem = parseBrDateToTimestamp(d.data);
+      if (tFim && tItem && tItem > tFim) return false;
+    }
+
     return true;
   });
 
@@ -466,22 +511,51 @@ export default function DoacoesPage() {
             <StatsCard title="Valor Total" value={formatCurrency(totalValor)} />
           </div>
 
-          <div className="filter-bar">
-            <Input placeholder="Buscar por nome..." />
-            <MaskedInput mask="date" placeholder="Data inicial" />
-            <MaskedInput mask="date" placeholder="Data final" />
+          <form className="filter-bar" onSubmit={(e) => { e.preventDefault(); handleApplyFilters(); }} style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center', marginBottom: '20px' }}>
+            <Input 
+              placeholder="Buscar por doador, CPF, nº documento..." 
+              value={filtros.busca}
+              onChange={(e) => setFiltros({ ...filtros, busca: e.target.value })}
+              style={{ flex: '1 1 200px' }}
+            />
+            <MaskedInput 
+              mask="date" 
+              placeholder="Data inicial" 
+              value={filtros.dataInicio}
+              onChange={(e) => setFiltros({ ...filtros, dataInicio: e.target.value })}
+              style={{ width: '140px' }}
+            />
+            <MaskedInput 
+              mask="date" 
+              placeholder="Data final" 
+              value={filtros.dataFim}
+              onChange={(e) => setFiltros({ ...filtros, dataFim: e.target.value })}
+              style={{ width: '140px' }}
+            />
             <select 
-              value={filtroLancado} 
-              onChange={(e) => setFiltroLancado(e.target.value)}
+              value={filtros.lancado} 
+              onChange={(e) => setFiltros({ ...filtros, lancado: e.target.value })}
               className="ui-input"
+              style={{ width: '180px' }}
             >
               <option value="todos">Todos (Lançamento)</option>
               <option value="sim">Lançados</option>
               <option value="nao">Não Lançados</option>
             </select>
-          </div>
+            <Button type="submit">🔍 Buscar</Button>
+            <Button type="button" variant="outline" onClick={handleClearFilters}>Limpar</Button>
+          </form>
 
-          <DataTable columns={columns} data={dataWithActions} isLoading={isLoading} />
+          <DataTable 
+            columns={columns} 
+            data={dataWithActions} 
+            isLoading={isLoading} 
+            onRowClick={(row) => {
+              setCurrentDoacao(row);
+              setViewMode('details');
+              window.scrollTo(0, 0);
+            }}
+          />
         </>
       )}
 
@@ -588,22 +662,48 @@ export default function DoacoesPage() {
         <>
           <PageHeader 
             title="Detalhes da Doação" 
-            actions={<Button variant="outline" onClick={() => setViewMode('list')}>← Voltar</Button>} 
+            actions={
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <Button onClick={() => handleOpenForm(currentDoacao)}>✏️ Editar</Button>
+                <Button variant="outline" onClick={() => setViewMode('list')}>← Voltar</Button>
+              </div>
+            } 
           />
           <Card className="view-details-card">
-            <div className="view-details">
-              <p><strong>Data:</strong> {currentDoacao.data}</p>
-              <p><strong>Doador:</strong> {currentDoacao.nomeDoador}</p>
-              <p><strong>CPF:</strong> {currentDoacao.cpf}</p>
-              <p><strong>Valor:</strong> {formatCurrency(currentDoacao.valor)}</p>
-              <p><strong>Documento:</strong> {currentDoacao.numeroDocumento}</p>
-              <p><strong>Lançado:</strong> {currentDoacao.lancado ? 'Sim' : 'Não'}</p>
+            <div className="view-details" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <strong>Data:</strong> <span>{currentDoacao.data}</span>
+                <Button variant="icon" size="sm" onClick={() => copyToClipboard(currentDoacao.data, 'Data')} title="Copiar Data">📋</Button>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <strong>Doador:</strong> <span>{currentDoacao.nomeDoador}</span>
+                <Button variant="icon" size="sm" onClick={() => copyToClipboard(currentDoacao.nomeDoador, 'Doador')} title="Copiar Doador">📋</Button>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <strong>CPF:</strong> <span>{currentDoacao.cpf}</span>
+                <Button variant="icon" size="sm" onClick={() => copyToClipboard(currentDoacao.cpf, 'CPF')} title="Copiar CPF">📋</Button>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <strong>Valor:</strong> <span>{formatCurrency(currentDoacao.valor)}</span>
+                <Button variant="icon" size="sm" onClick={() => copyToClipboard(formatCurrency(currentDoacao.valor), 'Valor')} title="Copiar Valor">📋</Button>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <strong>Documento:</strong> <span>{currentDoacao.numeroDocumento}</span>
+                <Button variant="icon" size="sm" onClick={() => copyToClipboard(currentDoacao.numeroDocumento, 'Documento')} title="Copiar Documento">📋</Button>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <strong>Lançado:</strong> <span>{currentDoacao.lancado ? 'Sim' : 'Não'}</span>
+                <Button variant="icon" size="sm" onClick={() => copyToClipboard(currentDoacao.lancado ? 'Sim' : 'Não', 'Status Lançado')} title="Copiar Status">📋</Button>
+              </div>
               <div className="mt-4">
                 <h4>Documentos Anexados:</h4>
                 <ul>
                   {currentDoacao.identidades?.map((f, i) => (
-                    <li key={i}>
-                      {f.url ? <a href={f.url} target="_blank" rel="noopener noreferrer">{f.name}</a> : f.name}
+                    <li key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                      {f.url ? <a href={f.url} target="_blank" rel="noopener noreferrer">{f.name}</a> : <span>{f.name}</span>}
+                      {f.url && (
+                        <Button variant="icon" size="sm" onClick={() => copyToClipboard(f.url, 'Link do Anexo')} title="Copiar Link do Anexo">📋</Button>
+                      )}
                     </li>
                   ))}
                   {(!currentDoacao.identidades || currentDoacao.identidades.length === 0) && <li>Nenhum documento anexado.</li>}

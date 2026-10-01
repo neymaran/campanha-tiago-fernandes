@@ -28,7 +28,24 @@ export default function DespesasPage() {
     cpfCnpj: '', nomeFornecedor: '', dataContratacao: '', itens: [], pagamentos: [], comprovantes: [], lancado: false
   });
   const [isLoading, setIsLoading] = useState(true);
-  const [filtroLancado, setFiltroLancado] = useState('todos');
+  const [filtros, setFiltros] = useState({ busca: '', dataInicio: '', dataFim: '', lancado: 'todos' });
+  const [filtrosAplicados, setFiltrosAplicados] = useState({ busca: '', dataInicio: '', dataFim: '', lancado: 'todos' });
+
+  const copyToClipboard = (text, label) => {
+    if (!text) return;
+    navigator.clipboard.writeText(String(text));
+    addToast(`${label || 'Informação'} copiada!`, 'success');
+  };
+
+  const handleApplyFilters = () => {
+    setFiltrosAplicados({ ...filtros });
+  };
+
+  const handleClearFilters = () => {
+    const empty = { busca: '', dataInicio: '', dataFim: '', lancado: 'todos' };
+    setFiltros(empty);
+    setFiltrosAplicados(empty);
+  };
 
   // Import State
   const [importData, setImportData] = useState([]);
@@ -523,9 +540,36 @@ export default function DespesasPage() {
     }
   };
 
+  const parseBrDateToTimestamp = (dateStr) => {
+    if (!dateStr || dateStr.length !== 10) return null;
+    const [dd, mm, yyyy] = dateStr.split('/');
+    if (!dd || !mm || !yyyy) return null;
+    return new Date(`${yyyy}-${mm.padStart(2, '0')}-${dd.padStart(2, '0')}T00:00:00`).getTime();
+  };
+
   const filteredDespesas = despesas.filter(d => {
-    if (filtroLancado === 'sim') return d.lancado === true;
-    if (filtroLancado === 'nao') return !d.lancado;
+    if (filtrosAplicados.lancado === 'sim' && !d.lancado) return false;
+    if (filtrosAplicados.lancado === 'nao' && d.lancado) return false;
+
+    if (filtrosAplicados.busca) {
+      const q = filtrosAplicados.busca.toLowerCase();
+      const matchFornecedor = (d.nomeFornecedor || '').toLowerCase().includes(q);
+      const matchCpfCnpj = (d.cpfCnpj || '').includes(q);
+      if (!matchFornecedor && !matchCpfCnpj) return false;
+    }
+
+    if (filtrosAplicados.dataInicio) {
+      const tInicio = parseBrDateToTimestamp(filtrosAplicados.dataInicio);
+      const tItem = parseBrDateToTimestamp(d.dataContratacao);
+      if (tInicio && tItem && tItem < tInicio) return false;
+    }
+
+    if (filtrosAplicados.dataFim) {
+      const tFim = parseBrDateToTimestamp(filtrosAplicados.dataFim);
+      const tItem = parseBrDateToTimestamp(d.dataContratacao);
+      if (tFim && tItem && tItem > tFim) return false;
+    }
+
     return true;
   });
 
@@ -634,18 +678,40 @@ export default function DespesasPage() {
             <StatsCard title="Total Pendente" value={formatCurrency(totalGeralPendente)} />
           </div>
 
-          <div className="filter-bar" style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
-            <Input placeholder="Buscar por fornecedor..." style={{ flex: 1 }} />
+          <form className="filter-bar" onSubmit={(e) => { e.preventDefault(); handleApplyFilters(); }} style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center', marginBottom: '20px' }}>
+            <Input 
+              placeholder="Buscar por fornecedor ou CPF/CNPJ..." 
+              value={filtros.busca}
+              onChange={(e) => setFiltros({ ...filtros, busca: e.target.value })}
+              style={{ flex: '1 1 200px' }}
+            />
+            <MaskedInput 
+              mask="date" 
+              placeholder="Data inicial" 
+              value={filtros.dataInicio}
+              onChange={(e) => setFiltros({ ...filtros, dataInicio: e.target.value })}
+              style={{ width: '140px' }}
+            />
+            <MaskedInput 
+              mask="date" 
+              placeholder="Data final" 
+              value={filtros.dataFim}
+              onChange={(e) => setFiltros({ ...filtros, dataFim: e.target.value })}
+              style={{ width: '140px' }}
+            />
             <select 
-              value={filtroLancado} 
-              onChange={(e) => setFiltroLancado(e.target.value)}
+              value={filtros.lancado} 
+              onChange={(e) => setFiltros({ ...filtros, lancado: e.target.value })}
               className="ui-input"
+              style={{ width: '180px' }}
             >
               <option value="todos">Todos (Lançamento)</option>
               <option value="sim">Lançados</option>
               <option value="nao">Não Lançados</option>
             </select>
-          </div>
+            <Button type="submit">🔍 Buscar</Button>
+            <Button type="button" variant="outline" onClick={handleClearFilters}>Limpar</Button>
+          </form>
 
           <DataTable 
             columns={[
@@ -661,6 +727,11 @@ export default function DespesasPage() {
             ]} 
             data={dataWithActions} 
             isLoading={isLoading}
+            onRowClick={(row) => {
+              setCurrentDespesa(row);
+              setViewMode('details');
+              window.scrollTo(0, 0);
+            }}
           />
         </>
       )}
@@ -836,40 +907,69 @@ export default function DespesasPage() {
         <>
           <PageHeader 
             title="Detalhes da Despesa" 
-            actions={<Button variant="outline" onClick={() => setViewMode('list')}>← Voltar</Button>} 
+            actions={
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <Button onClick={() => handleOpenForm(currentDespesa)}>✏️ Editar</Button>
+                <Button variant="outline" onClick={() => setViewMode('list')}>← Voltar</Button>
+              </div>
+            } 
           />
           <Card>
-            <div className="view-details" style={{ padding: '16px' }}>
-              <div className="details-header">
-                <p><strong>Fornecedor:</strong> {currentDespesa.nomeFornecedor} ({currentDespesa.cpfCnpj})</p>
-                <p><strong>Data:</strong> {currentDespesa.dataContratacao}</p>
-                <p><strong>Status:</strong> {currentDespesa.status?.toUpperCase()}</p>
-                <p><strong>Lançado:</strong> {currentDespesa.lancado ? 'Sim' : 'Não'}</p>
+            <div className="view-details" style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div className="details-header" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <strong>Fornecedor:</strong> <span>{currentDespesa.nomeFornecedor} ({currentDespesa.cpfCnpj})</span>
+                  <Button variant="icon" size="sm" onClick={() => copyToClipboard(`${currentDespesa.nomeFornecedor} (${currentDespesa.cpfCnpj})`, 'Fornecedor')} title="Copiar Fornecedor">📋</Button>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <strong>Data:</strong> <span>{currentDespesa.dataContratacao}</span>
+                  <Button variant="icon" size="sm" onClick={() => copyToClipboard(currentDespesa.dataContratacao, 'Data')} title="Copiar Data">📋</Button>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <strong>Status:</strong> <span>{currentDespesa.status?.toUpperCase()}</span>
+                  <Button variant="icon" size="sm" onClick={() => copyToClipboard(currentDespesa.status?.toUpperCase(), 'Status')} title="Copiar Status">📋</Button>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <strong>Lançado:</strong> <span>{currentDespesa.lancado ? 'Sim' : 'Não'}</span>
+                  <Button variant="icon" size="sm" onClick={() => copyToClipboard(currentDespesa.lancado ? 'Sim' : 'Não', 'Status Lançado')} title="Copiar Status">📋</Button>
+                </div>
               </div>
               <div className="mt-4">
                 <h4>Itens</h4>
-                <ul>
+                <ul style={{ listStyle: 'none', padding: 0 }}>
                   {currentDespesa.itens.map(i => (
-                    <li key={i.id}>{i.quantidade}x {i.descricao} - {formatCurrency(i.valorUnitario)} = {formatCurrency(i.total)}</li>
+                    <li key={i.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                      <span>{i.quantidade}x {i.descricao} - {formatCurrency(i.valorUnitario)} = {formatCurrency(i.total)}</span>
+                      <Button variant="icon" size="sm" onClick={() => copyToClipboard(`${i.quantidade}x ${i.descricao} - ${formatCurrency(i.valorUnitario)} = ${formatCurrency(i.total)}`, 'Item')} title="Copiar Item">📋</Button>
+                    </li>
                   ))}
                 </ul>
-                <p><strong>Total da Despesa:</strong> {formatCurrency(currentDespesa.totalDespesa)}</p>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px' }}>
+                  <strong>Total da Despesa:</strong> <span>{formatCurrency(currentDespesa.totalDespesa)}</span>
+                  <Button variant="icon" size="sm" onClick={() => copyToClipboard(formatCurrency(currentDespesa.totalDespesa), 'Total da Despesa')} title="Copiar Total">📋</Button>
+                </div>
               </div>
               <div className="mt-4">
                 <h4>Pagamentos</h4>
-                <ul>
+                <ul style={{ listStyle: 'none', padding: 0 }}>
                   {currentDespesa.pagamentos.map(p => (
-                    <li key={p.id}>{p.data} - {formatCurrency(p.valor)} ({p.numeroDocumento} / {p.contaOrigem})</li>
+                    <li key={p.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                      <span>{p.data} - {formatCurrency(p.valor)} ({p.numeroDocumento} / {p.contaOrigem})</span>
+                      <Button variant="icon" size="sm" onClick={() => copyToClipboard(`${p.data} - ${formatCurrency(p.valor)} (${p.numeroDocumento} / ${p.contaOrigem})`, 'Pagamento')} title="Copiar Pagamento">📋</Button>
+                    </li>
                   ))}
                   {currentDespesa.pagamentos.length === 0 && <li>Nenhum pagamento registrado.</li>}
                 </ul>
               </div>
               <div className="mt-4">
                 <h4>Comprovantes Anexados</h4>
-                <ul>
+                <ul style={{ listStyle: 'none', padding: 0 }}>
                   {currentDespesa.comprovantes?.map((f, i) => (
-                    <li key={i}>
-                      {f.url ? <a href={f.url} target="_blank" rel="noopener noreferrer">{f.name}</a> : f.name}
+                    <li key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                      {f.url ? <a href={f.url} target="_blank" rel="noopener noreferrer">{f.name}</a> : <span>{f.name}</span>}
+                      {f.url && (
+                        <Button variant="icon" size="sm" onClick={() => copyToClipboard(f.url, 'Link do Comprovante')} title="Copiar Link do Comprovante">📋</Button>
+                      )}
                     </li>
                   ))}
                   {(!currentDespesa.comprovantes || currentDespesa.comprovantes.length === 0) && <li>Nenhum documento anexado.</li>}
