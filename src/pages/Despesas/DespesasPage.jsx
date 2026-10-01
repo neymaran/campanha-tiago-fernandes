@@ -7,7 +7,7 @@ import { useToast } from '../../components/ui/Toast';
 import { collection, query, onSnapshot, doc, addDoc, updateDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
 import { ref, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage';
 import { db, storage } from '../../services/firebase';
-import { validateCPF, validateCNPJ } from '../../utils/formatters';
+import { validateCPF, validateCNPJ, formatCurrency, parseCurrency } from '../../utils/formatters';
 import * as XLSX from 'xlsx';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -203,13 +203,11 @@ export default function DespesasPage() {
     };
   }, []);
 
-  const formatCurrency = (val) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
-
   const [errors, setErrors] = useState({});
   const [uploadProgress, setUploadProgress] = useState(0);
 
-  const calculateTotal = (items) => items.reduce((acc, i) => acc + (parseFloat(i.quantidade||0) * parseFloat(i.valorUnitario||0)), 0);
-  const calculatePago = (payments) => payments.reduce((acc, p) => acc + parseFloat(p.valor||0), 0);
+  const calculateTotal = (items) => items.reduce((acc, i) => acc + (parseFloat(i.quantidade||0) * parseCurrency(i.valorUnitario)), 0);
+  const calculatePago = (payments) => payments.reduce((acc, p) => acc + parseCurrency(p.valor), 0);
 
   const determineStatus = (total, pago) => {
     if (pago === 0) return 'pendente';
@@ -308,7 +306,11 @@ export default function DespesasPage() {
 
   const handleOpenForm = (despesa = null) => {
     if (despesa) {
-      setFormData({ ...despesa });
+      setFormData({ 
+        ...despesa,
+        itens: despesa.itens.map(i => ({ ...i, valorUnitario: formatCurrency(i.valorUnitario) })),
+        pagamentos: despesa.pagamentos.map(p => ({ ...p, valor: formatCurrency(p.valor) }))
+      });
       setCurrentDespesa(despesa);
     } else {
       setFormData({ cpfCnpj: '', nomeFornecedor: '', dataContratacao: '', itens: [], pagamentos: [], comprovantes: [], lancado: false });
@@ -358,13 +360,13 @@ export default function DespesasPage() {
     const cleanedItens = formData.itens.map(i => ({
       ...i,
       quantidade: parseFloat(i.quantidade||0),
-      valorUnitario: parseFloat(i.valorUnitario||0),
-      total: parseFloat(i.quantidade||0) * parseFloat(i.valorUnitario||0)
+      valorUnitario: parseCurrency(i.valorUnitario),
+      total: parseFloat(i.quantidade||0) * parseCurrency(i.valorUnitario)
     }));
 
     const cleanedPagamentos = formData.pagamentos.map(p => ({
       ...p,
-      valor: parseFloat(p.valor||0)
+      valor: parseCurrency(p.valor)
     }));
 
     const tDespesa = calculateTotal(cleanedItens);
@@ -485,13 +487,13 @@ export default function DespesasPage() {
     }
   };
 
-  const addItem = () => setFormData({ ...formData, itens: [...formData.itens, { id: Math.random().toString(), descricao: '', quantidade: 1, valorUnitario: 0, total: 0 }] });
+  const addItem = () => setFormData({ ...formData, itens: [...formData.itens, { id: Math.random().toString(), descricao: '', quantidade: 1, valorUnitario: '', total: 0 }] });
   const removeItem = (id) => setFormData({ ...formData, itens: formData.itens.filter(i => i.id !== id) });
   const updateItem = (id, field, value) => {
     const newItems = formData.itens.map(i => {
       if (i.id === id) {
         const updated = { ...i, [field]: value };
-        updated.total = parseFloat(updated.quantidade||0) * parseFloat(updated.valorUnitario||0);
+        updated.total = parseFloat(updated.quantidade||0) * parseCurrency(updated.valorUnitario);
         return updated;
       }
       return i;
@@ -499,7 +501,7 @@ export default function DespesasPage() {
     setFormData({ ...formData, itens: newItems });
   };
 
-  const addPagamento = () => setFormData({ ...formData, pagamentos: [...formData.pagamentos, { id: Math.random().toString(), data: '', valor: 0, numeroDocumento: '', contaOrigem: '' }] });
+  const addPagamento = () => setFormData({ ...formData, pagamentos: [...formData.pagamentos, { id: Math.random().toString(), data: '', valor: '', numeroDocumento: '', contaOrigem: '' }] });
   const removePagamento = (id) => setFormData({ ...formData, pagamentos: formData.pagamentos.filter(p => p.id !== id) });
   const updatePagamento = (id, field, value) => {
     const realVal = (typeof value === 'object' && value !== null && 'target' in value) ? value.target.value : value;
@@ -766,9 +768,9 @@ export default function DespesasPage() {
                     <tr key={item.id}>
                       <td><Input value={item.descricao} onChange={(e) => updateItem(item.id, 'descricao', e.target.value)} /></td>
                       <td><Input type="number" value={item.quantidade} onChange={(e) => updateItem(item.id, 'quantidade', e.target.value)} /></td>
-                      <td><Input type="number" step="0.01" value={item.valorUnitario} onChange={(e) => updateItem(item.id, 'valorUnitario', e.target.value)} /></td>
+                      <td><MaskedInput mask="currency" value={item.valorUnitario} onChange={(e) => updateItem(item.id, 'valorUnitario', e.target.value)} /></td>
                       <td>{formatCurrency(item.total)}</td>
-                      <td><Button variant="icon" className="danger" onClick={() => removeItem(item.id)}>❌</Button></td>
+                      <td><Button variant="icon" className="danger" onClick={() => removeItem(item.id)} title="Remover item">❌</Button></td>
                     </tr>
                   ))}
                 </tbody>
@@ -798,10 +800,10 @@ export default function DespesasPage() {
                   {formData.pagamentos.map(pag => (
                     <tr key={pag.id}>
                       <td><MaskedInput mask="date" value={pag.data} onChange={(e) => updatePagamento(pag.id, 'data', e.target.value)} /></td>
-                      <td><Input type="number" step="0.01" value={pag.valor} onChange={(e) => updatePagamento(pag.id, 'valor', e.target.value)} /></td>
+                      <td><MaskedInput mask="currency" value={pag.valor} onChange={(e) => updatePagamento(pag.id, 'valor', e.target.value)} /></td>
                       <td><Input value={pag.numeroDocumento} onChange={(e) => updatePagamento(pag.id, 'numeroDocumento', e.target.value)} /></td>
                       <td><Select options={contasOptions} value={pag.contaOrigem} onChange={(e) => updatePagamento(pag.id, 'contaOrigem', e.target.value)} /></td>
-                      <td><Button variant="icon" className="danger" onClick={() => removePagamento(pag.id)}>❌</Button></td>
+                      <td><Button variant="icon" className="danger" onClick={() => removePagamento(pag.id)} title="Remover pagamento">❌</Button></td>
                     </tr>
                   ))}
                 </tbody>

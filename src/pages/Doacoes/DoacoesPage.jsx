@@ -200,7 +200,7 @@ export default function DoacoesPage() {
 
   const handleOpenForm = (doacao = null) => {
     if (doacao) {
-      setFormData({ ...doacao, valor: doacao.valor ? doacao.valor.toString() : '' });
+      setFormData({ ...doacao, valor: doacao.valor ? formatCurrency(doacao.valor) : '' });
       setCurrentDoacao(doacao);
     } else {
       setFormData({ data: '', nomeDoador: '', valor: '', cpf: '', numeroDocumento: '', identidades: [], lancado: false });
