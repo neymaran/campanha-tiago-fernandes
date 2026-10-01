@@ -8,6 +8,7 @@ import { collection, query, onSnapshot, doc, addDoc, updateDoc, deleteDoc, serve
 import { ref, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage';
 import { db, storage } from '../../services/firebase';
 import { formatCurrency, parseCurrency, validateCPF } from '../../utils/formatters';
+import * as XLSX from 'xlsx';
 import './DoacoesPage.css';
 
 export default function DoacoesPage() {
@@ -24,6 +25,126 @@ export default function DoacoesPage() {
   });
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
+
+  // Import State
+  const [importData, setImportData] = useState([]);
+  const [importErrors, setImportErrors] = useState([]);
+
+  const downloadTemplate = () => {
+    const ws = XLSX.utils.aoa_to_sheet([
+      ['Data (DD/MM/YYYY)', 'Nome do Doador', 'CPF (Somente Números)', 'Valor (Ex: 150.50)', 'Nº Documento']
+    ]);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Doacoes');
+    XLSX.writeFile(wb, 'Template_Importacao_Doacoes.xlsx');
+  };
+
+  const handleImportFile = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      const bstr = evt.target.result;
+      const wb = XLSX.read(bstr, { type: 'binary' });
+      const wsname = wb.SheetNames[0];
+      const ws = wb.Sheets[wsname];
+      const data = XLSX.utils.sheet_to_json(ws, { header: 1 });
+      
+      const rows = data.slice(1).filter(r => r.length > 0 && r.some(c => c !== undefined && c !== '')); 
+      
+      const parsed = [];
+      const errs = [];
+
+      rows.forEach((row, index) => {
+        const [dataObj, nome, cpfVal, valorVal, numDoc] = row;
+        const rowNum = index + 2;
+        let rowErrors = [];
+
+        let dataStr = dataObj;
+        if (typeof dataObj === 'number') {
+           const dateInfo = XLSX.SSF.parse_date_code(dataObj);
+           dataStr = `${String(dateInfo.d).padStart(2, '0')}/${String(dateInfo.m).padStart(2, '0')}/${dateInfo.y}`;
+        } else if (dataObj) {
+           dataStr = String(dataObj).trim();
+        }
+
+        const nomeStr = nome ? String(nome).trim() : '';
+        const cpfStr = cpfVal ? String(cpfVal).replace(/\D/g, '') : '';
+        const numDocStr = numDoc ? String(numDoc).trim() : '';
+        
+        let valorNum = 0;
+        if (typeof valorVal === 'number') {
+           valorNum = valorVal;
+        } else if (typeof valorVal === 'string') {
+           valorNum = parseFloat(valorVal.replace(',', '.'));
+        }
+
+        if (!dataStr) rowErrors.push('Data é obrigatória');
+        if (!nomeStr) rowErrors.push('Nome do Doador é obrigatório');
+        if (!valorNum || isNaN(valorNum)) rowErrors.push('Valor inválido');
+        if (!cpfStr || cpfStr.length !== 11 || !validateCPF(cpfStr)) rowErrors.push('CPF inválido');
+
+        const item = {
+           linha: rowNum,
+           data: dataStr || '',
+           nomeDoador: nomeStr,
+           cpf: cpfStr,
+           valor: isNaN(valorNum) ? 0 : valorNum,
+           numeroDocumento: numDocStr
+        };
+
+        parsed.push(item);
+        if (rowErrors.length > 0) {
+           errs.push({ linha: rowNum, errors: rowErrors, item });
+        }
+      });
+
+      setImportData(parsed);
+      setImportErrors(errs);
+    };
+    reader.readAsBinaryString(file);
+  };
+
+  const confirmImport = async (ignoreErrors = false) => {
+    setIsSubmitting(true);
+    let successCount = 0;
+    try {
+      const toImport = ignoreErrors 
+        ? importData.filter(d => !importErrors.find(e => e.linha === d.linha))
+        : importData;
+
+      if (toImport.length === 0) {
+        addToast('Nenhum dado válido para importar.', 'warning');
+        setIsSubmitting(false);
+        return;
+      }
+
+      for (const item of toImport) {
+        await addDoc(collection(db, 'doacoes'), {
+          data: item.data,
+          nomeDoador: item.nomeDoador,
+          cpf: item.cpf,
+          valor: item.valor,
+          numeroDocumento: item.numeroDocumento,
+          identidades: [],
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp()
+        });
+        successCount++;
+      }
+
+      addToast(`${successCount} doações importadas com sucesso!`, 'success');
+      setViewMode('list');
+      setImportData([]);
+      setImportErrors([]);
+    } catch (err) {
+      console.error(err);
+      addToast('Erro ao importar doações', 'error');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   useEffect(() => {
     const q = query(collection(db, 'doacoes'));
@@ -248,7 +369,14 @@ export default function DoacoesPage() {
         <>
           <PageHeader 
             title="Doações" 
-            actions={<Button onClick={() => handleOpenForm()}>Nova Doação</Button>} 
+            actions={
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <Button variant="outline" onClick={() => {
+                  setImportData([]); setImportErrors([]); setViewMode('import'); window.scrollTo(0, 0);
+                }}>Importar Planilha</Button>
+                <Button onClick={() => handleOpenForm()}>Nova Doação</Button>
+              </div>
+            } 
           />
 
           <div className="stats-container">
@@ -263,6 +391,62 @@ export default function DoacoesPage() {
           </div>
 
           <DataTable columns={columns} data={dataWithActions} isLoading={isLoading} />
+        </>
+      )}
+
+      {viewMode === 'import' && (
+        <>
+          <PageHeader 
+            title="Importar Doações" 
+            actions={<Button variant="outline" onClick={() => setViewMode('list')}>← Voltar</Button>} 
+          />
+          <Card className="form-card">
+            <div style={{ marginBottom: '20px' }}>
+              <h3>1. Baixe o Layout</h3>
+              <p>Utilize a planilha modelo para preencher as doações corretamente. Não altere a ordem das colunas.</p>
+              <Button onClick={downloadTemplate} variant="outline">Baixar Planilha de Exemplo (.xlsx)</Button>
+            </div>
+
+            <div style={{ marginBottom: '20px' }}>
+              <h3>2. Envie o Arquivo Preenchido</h3>
+              <input type="file" accept=".xlsx, .xls" onChange={handleImportFile} style={{ display: 'block', marginTop: '10px' }} />
+            </div>
+
+            {importData.length > 0 && (
+              <div style={{ marginTop: '20px' }}>
+                <h3>Resumo da Importação</h3>
+                <p>Total de linhas lidas: {importData.length}</p>
+                <p>Linhas com erro: <span style={{ color: importErrors.length > 0 ? '#d93025' : '#1e8e3e', fontWeight: 'bold' }}>{importErrors.length}</span></p>
+
+                {importErrors.length > 0 && (
+                  <div style={{ background: '#fce8e6', padding: '15px', borderRadius: '8px', marginTop: '15px' }}>
+                    <h4 style={{ color: '#d93025', marginTop: 0 }}>Atenção: Foram encontrados erros nas seguintes linhas:</h4>
+                    <ul style={{ color: '#d93025', margin: 0, paddingLeft: '20px', maxHeight: '150px', overflowY: 'auto' }}>
+                      {importErrors.map((err, idx) => (
+                        <li key={idx}><strong>Linha {err.linha}:</strong> {err.errors.join(', ')}</li>
+                      ))}
+                    </ul>
+                    <p style={{ marginTop: '10px', fontSize: '0.9em', color: '#d93025' }}>
+                      Você pode cancelar e corrigir a planilha, ou importar apenas as linhas válidas ignorando os erros.
+                    </p>
+                  </div>
+                )}
+
+                <div className="modal-actions mt-4" style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '20px' }}>
+                  <Button variant="outline" onClick={() => setViewMode('list')} disabled={isSubmitting}>Cancelar</Button>
+                  {importErrors.length > 0 ? (
+                    <Button onClick={() => confirmImport(true)} isLoading={isSubmitting} className="danger">
+                      Importar Ignorando Erros
+                    </Button>
+                  ) : (
+                    <Button onClick={() => confirmImport(false)} isLoading={isSubmitting}>
+                      Confirmar Importação
+                    </Button>
+                  )}
+                </div>
+              </div>
+            )}
+          </Card>
         </>
       )}
 

@@ -8,6 +8,7 @@ import { collection, query, onSnapshot, doc, addDoc, updateDoc, deleteDoc, serve
 import { ref, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage';
 import { db, storage } from '../../services/firebase';
 import { validateCPF, validateCNPJ } from '../../utils/formatters';
+import * as XLSX from 'xlsx';
 import './DespesasPage.css';
 
 export default function DespesasPage() {
@@ -25,6 +26,155 @@ export default function DespesasPage() {
     cpfCnpj: '', nomeFornecedor: '', dataContratacao: '', itens: [], pagamentos: [], comprovantes: []
   });
   const [isLoading, setIsLoading] = useState(true);
+
+  // Import State
+  const [importData, setImportData] = useState([]);
+  const [importErrors, setImportErrors] = useState([]);
+
+  const downloadTemplate = () => {
+    const ws = XLSX.utils.aoa_to_sheet([
+      ['Data (DD/MM/YYYY)', 'Fornecedor', 'CPF/CNPJ (Somente Números)', 'Valor Total (Ex: 150.50)', 'Valor Pago (Ex: 150.50)']
+    ]);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Despesas');
+    XLSX.writeFile(wb, 'Template_Importacao_Despesas.xlsx');
+  };
+
+  const handleImportFile = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      const bstr = evt.target.result;
+      const wb = XLSX.read(bstr, { type: 'binary' });
+      const wsname = wb.SheetNames[0];
+      const ws = wb.Sheets[wsname];
+      const data = XLSX.utils.sheet_to_json(ws, { header: 1 });
+      
+      const rows = data.slice(1).filter(r => r.length > 0 && r.some(c => c !== undefined && c !== '')); 
+      
+      const parsed = [];
+      const errs = [];
+
+      rows.forEach((row, index) => {
+        const [dataObj, fornecedor, cpfCnpjVal, totalVal, pagoVal] = row;
+        const rowNum = index + 2;
+        let rowErrors = [];
+
+        let dataStr = dataObj;
+        if (typeof dataObj === 'number') {
+           const dateInfo = XLSX.SSF.parse_date_code(dataObj);
+           dataStr = `${String(dateInfo.d).padStart(2, '0')}/${String(dateInfo.m).padStart(2, '0')}/${dateInfo.y}`;
+        } else if (dataObj) {
+           dataStr = String(dataObj).trim();
+        }
+
+        const fornStr = fornecedor ? String(fornecedor).trim() : '';
+        const docStr = cpfCnpjVal ? String(cpfCnpjVal).replace(/\D/g, '') : '';
+        
+        const parseMoney = (val) => {
+           if (typeof val === 'number') return val;
+           if (typeof val === 'string') return parseFloat(val.replace(',', '.'));
+           return 0;
+        };
+
+        const vTotal = parseMoney(totalVal);
+        const vPago = parseMoney(pagoVal);
+
+        if (!dataStr) rowErrors.push('Data é obrigatória');
+        if (!fornStr) rowErrors.push('Fornecedor é obrigatório');
+        if (!vTotal || isNaN(vTotal)) rowErrors.push('Valor Total inválido');
+        if (isNaN(vPago)) rowErrors.push('Valor Pago inválido');
+        
+        if (docStr.length > 0) {
+           if (docStr.length === 11 && !validateCPF(docStr)) rowErrors.push('CPF inválido');
+           else if (docStr.length === 14 && !validateCNPJ(docStr)) rowErrors.push('CNPJ inválido');
+           else if (docStr.length !== 11 && docStr.length !== 14) rowErrors.push('Documento com tamanho inválido');
+        }
+
+        const status = vPago >= vTotal ? 'pago' : (vPago > 0 ? 'parcial' : 'pendente');
+
+        const item = {
+           linha: rowNum,
+           dataContratacao: dataStr || '',
+           nomeFornecedor: fornStr,
+           cpfCnpj: docStr,
+           totalDespesa: isNaN(vTotal) ? 0 : vTotal,
+           totalPago: isNaN(vPago) ? 0 : vPago,
+           status
+        };
+
+        parsed.push(item);
+        if (rowErrors.length > 0) {
+           errs.push({ linha: rowNum, errors: rowErrors, item });
+        }
+      });
+
+      setImportData(parsed);
+      setImportErrors(errs);
+    };
+    reader.readAsBinaryString(file);
+  };
+
+  const confirmImport = async (ignoreErrors = false) => {
+    setIsSubmitting(true);
+    let successCount = 0;
+    try {
+      const toImport = ignoreErrors 
+        ? importData.filter(d => !importErrors.find(e => e.linha === d.linha))
+        : importData;
+
+      if (toImport.length === 0) {
+        addToast('Nenhum dado válido para importar.', 'warning');
+        setIsSubmitting(false);
+        return;
+      }
+
+      for (const item of toImport) {
+        const itensList = [{
+          id: Math.random().toString(),
+          descricao: 'Importado via planilha',
+          quantidade: 1,
+          valorUnitario: item.totalDespesa,
+          total: item.totalDespesa
+        }];
+        
+        const pagamentosList = item.totalPago > 0 ? [{
+          id: Math.random().toString(),
+          data: item.dataContratacao,
+          valor: item.totalPago,
+          contaOrigem: '',
+          numeroDocumento: 'Importado'
+        }] : [];
+
+        await addDoc(collection(db, 'despesas'), {
+          dataContratacao: item.dataContratacao,
+          nomeFornecedor: item.nomeFornecedor,
+          cpfCnpj: item.cpfCnpj,
+          totalDespesa: item.totalDespesa,
+          totalPago: item.totalPago,
+          status: item.status,
+          itens: itensList,
+          pagamentos: pagamentosList,
+          comprovantes: [],
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp()
+        });
+        successCount++;
+      }
+
+      addToast(`${successCount} despesas importadas com sucesso!`, 'success');
+      setViewMode('list');
+      setImportData([]);
+      setImportErrors([]);
+    } catch (err) {
+      console.error(err);
+      addToast('Erro ao importar despesas', 'error');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   useEffect(() => {
     const qDespesas = query(collection(db, 'despesas'));
@@ -384,7 +534,17 @@ export default function DespesasPage() {
     <div className="despesas-page">
       {viewMode === 'list' && (
         <>
-          <PageHeader title="Despesas" actions={<Button onClick={() => handleOpenForm()}>Nova Despesa</Button>} />
+          <PageHeader 
+            title="Despesas" 
+            actions={
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <Button variant="outline" onClick={() => {
+                  setImportData([]); setImportErrors([]); setViewMode('import'); window.scrollTo(0, 0);
+                }}>Importar Planilha</Button>
+                <Button onClick={() => handleOpenForm()}>Nova Despesa</Button>
+              </div>
+            } 
+          />
 
           <div className="stats-container">
             <StatsCard title="Total de Despesas" value={formatCurrency(totalGeral)} />
@@ -406,6 +566,62 @@ export default function DespesasPage() {
             data={dataWithActions} 
             isLoading={isLoading}
           />
+        </>
+      )}
+
+      {viewMode === 'import' && (
+        <>
+          <PageHeader 
+            title="Importar Despesas" 
+            actions={<Button variant="outline" onClick={() => setViewMode('list')}>← Voltar</Button>} 
+          />
+          <Card className="form-card">
+            <div style={{ marginBottom: '20px' }}>
+              <h3>1. Baixe o Layout</h3>
+              <p>Utilize a planilha modelo para preencher as despesas corretamente. Não altere a ordem das colunas.</p>
+              <Button onClick={downloadTemplate} variant="outline">Baixar Planilha de Exemplo (.xlsx)</Button>
+            </div>
+
+            <div style={{ marginBottom: '20px' }}>
+              <h3>2. Envie o Arquivo Preenchido</h3>
+              <input type="file" accept=".xlsx, .xls" onChange={handleImportFile} style={{ display: 'block', marginTop: '10px' }} />
+            </div>
+
+            {importData.length > 0 && (
+              <div style={{ marginTop: '20px' }}>
+                <h3>Resumo da Importação</h3>
+                <p>Total de linhas lidas: {importData.length}</p>
+                <p>Linhas com erro: <span style={{ color: importErrors.length > 0 ? '#d93025' : '#1e8e3e', fontWeight: 'bold' }}>{importErrors.length}</span></p>
+
+                {importErrors.length > 0 && (
+                  <div style={{ background: '#fce8e6', padding: '15px', borderRadius: '8px', marginTop: '15px' }}>
+                    <h4 style={{ color: '#d93025', marginTop: 0 }}>Atenção: Foram encontrados erros nas seguintes linhas:</h4>
+                    <ul style={{ color: '#d93025', margin: 0, paddingLeft: '20px', maxHeight: '150px', overflowY: 'auto' }}>
+                      {importErrors.map((err, idx) => (
+                        <li key={idx}><strong>Linha {err.linha}:</strong> {err.errors.join(', ')}</li>
+                      ))}
+                    </ul>
+                    <p style={{ marginTop: '10px', fontSize: '0.9em', color: '#d93025' }}>
+                      Você pode cancelar e corrigir a planilha, ou importar apenas as linhas válidas ignorando os erros.
+                    </p>
+                  </div>
+                )}
+
+                <div className="modal-actions mt-4" style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '20px' }}>
+                  <Button variant="outline" onClick={() => setViewMode('list')} disabled={isSubmitting}>Cancelar</Button>
+                  {importErrors.length > 0 ? (
+                    <Button onClick={() => confirmImport(true)} isLoading={isSubmitting} className="danger">
+                      Importar Ignorando Erros
+                    </Button>
+                  ) : (
+                    <Button onClick={() => confirmImport(false)} isLoading={isSubmitting}>
+                      Confirmar Importação
+                    </Button>
+                  )}
+                </div>
+              </div>
+            )}
+          </Card>
         </>
       )}
 
