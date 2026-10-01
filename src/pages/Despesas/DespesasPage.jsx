@@ -9,6 +9,8 @@ import { ref, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebas
 import { db, storage } from '../../services/firebase';
 import { validateCPF, validateCNPJ } from '../../utils/formatters';
 import * as XLSX from 'xlsx';
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
 import './DespesasPage.css';
 
 export default function DespesasPage() {
@@ -529,6 +531,54 @@ export default function DespesasPage() {
   const totalGeralPago = filteredDespesas.reduce((acc, curr) => acc + curr.totalPago, 0);
   const totalGeralPendente = totalGeral - totalGeralPago;
 
+  const handleExportPDF = () => {
+    const doc = new jsPDF();
+    
+    // Configurar título
+    doc.setFontSize(18);
+    doc.text('Relatório de Despesas', 14, 22);
+    
+    // Detalhes
+    doc.setFontSize(10);
+    doc.setTextColor(100);
+    const dateStr = new Date().toLocaleDateString('pt-BR');
+    doc.text(`Gerado em: ${dateStr}`, 14, 30);
+    
+    // Preparar dados para tabela
+    const tableColumn = ["Data", "Fornecedor", "CPF/CNPJ", "Status", "Valor Total", "Valor Pago", "Lançado"];
+    const tableRows = [];
+
+    filteredDespesas.forEach(d => {
+      const row = [
+        d.dataContratacao || '',
+        d.nomeFornecedor || '',
+        d.cpfCnpj || '',
+        (d.status || '').toUpperCase(),
+        formatCurrency(d.totalDespesa || 0),
+        formatCurrency(d.totalPago || 0),
+        d.lancado ? 'Sim' : 'Não'
+      ];
+      tableRows.push(row);
+    });
+
+    tableRows.push(['', '', '', 'TOTAIS:', formatCurrency(totalGeral), formatCurrency(totalGeralPago), '']);
+
+    doc.autoTable({
+      head: [tableColumn],
+      body: tableRows,
+      startY: 35,
+      styles: { fontSize: 9 },
+      headStyles: { fillColor: [13, 110, 63] }, // Tema verde
+      didParseCell: function(data) {
+        if (data.row.index === tableRows.length - 1) {
+          data.cell.styles.fontStyle = 'bold';
+        }
+      }
+    });
+
+    doc.save('relatorio-despesas.pdf');
+  };
+
   const dataWithActions = filteredDespesas.map(d => {
     const hasAnexo = Boolean(d.comprovantes && d.comprovantes.length > 0);
     return {
@@ -567,6 +617,7 @@ export default function DespesasPage() {
             title="Despesas" 
             actions={
               <div style={{ display: 'flex', gap: '8px' }}>
+                <Button variant="outline" onClick={handleExportPDF}>Exportar PDF</Button>
                 <Button variant="outline" onClick={() => {
                   setImportData([]); setImportErrors([]); setViewMode('import'); window.scrollTo(0, 0);
                 }}>Importar Planilha</Button>

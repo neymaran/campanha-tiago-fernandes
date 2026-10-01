@@ -9,6 +9,8 @@ import { ref, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebas
 import { db, storage } from '../../services/firebase';
 import { formatCurrency, parseCurrency, validateCPF } from '../../utils/formatters';
 import * as XLSX from 'xlsx';
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
 import './DoacoesPage.css';
 
 export default function DoacoesPage() {
@@ -365,6 +367,55 @@ export default function DoacoesPage() {
     return true;
   });
 
+  const handleExportPDF = () => {
+    const doc = new jsPDF();
+    
+    // Configurar título
+    doc.setFontSize(18);
+    doc.text('Relatório de Doações', 14, 22);
+    
+    // Detalhes
+    doc.setFontSize(10);
+    doc.setTextColor(100);
+    const dateStr = new Date().toLocaleDateString('pt-BR');
+    doc.text(`Gerado em: ${dateStr}`, 14, 30);
+    
+    // Preparar dados para tabela
+    const tableColumn = ["Data", "Doador", "CPF", "Nº Doc.", "Valor", "Lançado"];
+    const tableRows = [];
+
+    filteredDoacoes.forEach(d => {
+      const row = [
+        d.data || '',
+        d.nomeDoador || '',
+        d.cpf || '',
+        d.numeroDocumento || '',
+        formatCurrency(d.valor || 0),
+        d.lancado ? 'Sim' : 'Não'
+      ];
+      tableRows.push(row);
+    });
+
+    // Calcular totais
+    const totalFiltrado = filteredDoacoes.reduce((acc, curr) => acc + (curr.valor || 0), 0);
+    tableRows.push(['', '', '', 'TOTAL:', formatCurrency(totalFiltrado), '']);
+
+    doc.autoTable({
+      head: [tableColumn],
+      body: tableRows,
+      startY: 35,
+      styles: { fontSize: 9 },
+      headStyles: { fillColor: [13, 110, 63] }, // Tema verde
+      didParseCell: function(data) {
+        if (data.row.index === tableRows.length - 1) {
+          data.cell.styles.fontStyle = 'bold';
+        }
+      }
+    });
+
+    doc.save('relatorio-doacoes.pdf');
+  };
+
   const dataWithActions = filteredDoacoes.map(d => {
     const hasAnexo = Boolean(d.identidades && d.identidades.length > 0);
     return {
@@ -401,6 +452,7 @@ export default function DoacoesPage() {
             title="Doações" 
             actions={
               <div style={{ display: 'flex', gap: '8px' }}>
+                <Button variant="outline" onClick={handleExportPDF}>Exportar PDF</Button>
                 <Button variant="outline" onClick={() => {
                   setImportData([]); setImportErrors([]); setViewMode('import'); window.scrollTo(0, 0);
                 }}>Importar Planilha</Button>
