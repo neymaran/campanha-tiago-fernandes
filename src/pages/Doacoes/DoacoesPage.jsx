@@ -21,10 +21,11 @@ export default function DoacoesPage() {
   
   const [errors, setErrors] = useState({});
   const [formData, setFormData] = useState({
-    data: '', nomeDoador: '', valor: '', cpf: '', numeroDocumento: '', identidades: []
+    data: '', nomeDoador: '', valor: '', cpf: '', numeroDocumento: '', identidades: [], lancado: false
   });
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
+  const [filtroLancado, setFiltroLancado] = useState('todos');
 
   // Import State
   const [importData, setImportData] = useState([]);
@@ -128,6 +129,7 @@ export default function DoacoesPage() {
           valor: item.valor,
           numeroDocumento: item.numeroDocumento,
           identidades: [],
+          lancado: false,
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp()
         });
@@ -173,6 +175,7 @@ export default function DoacoesPage() {
     { key: 'valorFormatted', label: 'Valor' },
     { key: 'numeroDocumento', label: 'Nº Documento' },
     { key: 'anexoBadge', label: 'Anexo' },
+    { key: 'lancadoCheck', label: 'Lançado' },
     { key: 'actions', label: 'Ações' }
   ];
 
@@ -198,7 +201,7 @@ export default function DoacoesPage() {
       setFormData({ ...doacao, valor: doacao.valor ? doacao.valor.toString() : '' });
       setCurrentDoacao(doacao);
     } else {
-      setFormData({ data: '', nomeDoador: '', valor: '', cpf: '', numeroDocumento: '', identidades: [] });
+      setFormData({ data: '', nomeDoador: '', valor: '', cpf: '', numeroDocumento: '', identidades: [], lancado: false });
       setCurrentDoacao(null);
     }
     setErrors({});
@@ -234,6 +237,7 @@ export default function DoacoesPage() {
         valor: valorNum,
         cpf: formData.cpf,
         numeroDocumento: formData.numeroDocumento,
+        lancado: formData.lancado || false,
       };
 
       let docId;
@@ -343,7 +347,25 @@ export default function DoacoesPage() {
     }
   };
 
-  const dataWithActions = doacoes.map(d => {
+  const handleToggleLancado = async (doacao) => {
+    try {
+      await updateDoc(doc(db, 'doacoes', doacao.id), {
+        lancado: !doacao.lancado,
+        updatedAt: serverTimestamp()
+      });
+    } catch (err) {
+      console.error('Erro ao atualizar status de lançamento:', err);
+      addToast('Erro ao atualizar status', 'error');
+    }
+  };
+
+  const filteredDoacoes = doacoes.filter(d => {
+    if (filtroLancado === 'sim') return d.lancado === true;
+    if (filtroLancado === 'nao') return !d.lancado;
+    return true;
+  });
+
+  const dataWithActions = filteredDoacoes.map(d => {
     const hasAnexo = Boolean(d.identidades && d.identidades.length > 0);
     return {
       ...d,
@@ -352,6 +374,14 @@ export default function DoacoesPage() {
         <Badge variant={hasAnexo ? 'info' : 'neutral'} size="sm">
           {hasAnexo ? '📎 Com anexo' : 'Sem anexo'}
         </Badge>
+      ),
+      lancadoCheck: (
+        <input 
+          type="checkbox" 
+          checked={!!d.lancado} 
+          onChange={() => handleToggleLancado(d)} 
+          style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+        />
       ),
       actions: (
         <div className="action-buttons">
@@ -388,6 +418,15 @@ export default function DoacoesPage() {
             <Input placeholder="Buscar por nome..." />
             <MaskedInput mask="date" placeholder="Data inicial" />
             <MaskedInput mask="date" placeholder="Data final" />
+            <select 
+              value={filtroLancado} 
+              onChange={(e) => setFiltroLancado(e.target.value)}
+              className="ui-input"
+            >
+              <option value="todos">Todos (Lançamento)</option>
+              <option value="sim">Lançados</option>
+              <option value="nao">Não Lançados</option>
+            </select>
           </div>
 
           <DataTable columns={columns} data={dataWithActions} isLoading={isLoading} />
@@ -463,6 +502,15 @@ export default function DoacoesPage() {
               <MaskedInput mask="currency" label="Valor (R$)" value={formData.valor} onChange={(e) => setFormData({...formData, valor: e.target.value})} required />
               <MaskedInput mask="cpf" label="CPF" value={formData.cpf} onChange={handleCpfChange} error={errors.cpf} required />
               <Input label="Nº do Documento no extrato" value={formData.numeroDocumento} onChange={(e) => setFormData({...formData, numeroDocumento: e.target.value})} required />
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', gridColumn: '1 / -1', cursor: 'pointer', marginTop: '10px' }}>
+                <input 
+                  type="checkbox" 
+                  checked={formData.lancado || false} 
+                  onChange={(e) => setFormData({...formData, lancado: e.target.checked})} 
+                  style={{ width: '18px', height: '18px' }}
+                />
+                Marcar como Lançado
+              </label>
             </div>
             <div className="mt-4">
               <FileUpload 
@@ -497,6 +545,7 @@ export default function DoacoesPage() {
               <p><strong>CPF:</strong> {currentDoacao.cpf}</p>
               <p><strong>Valor:</strong> {formatCurrency(currentDoacao.valor)}</p>
               <p><strong>Documento:</strong> {currentDoacao.numeroDocumento}</p>
+              <p><strong>Lançado:</strong> {currentDoacao.lancado ? 'Sim' : 'Não'}</p>
               <div className="mt-4">
                 <h4>Documentos Anexados:</h4>
                 <ul>

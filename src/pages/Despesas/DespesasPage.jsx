@@ -23,9 +23,10 @@ export default function DespesasPage() {
   const [isSearchingCNPJ, setIsSearchingCNPJ] = useState(false);
 
   const [formData, setFormData] = useState({
-    cpfCnpj: '', nomeFornecedor: '', dataContratacao: '', itens: [], pagamentos: [], comprovantes: []
+    cpfCnpj: '', nomeFornecedor: '', dataContratacao: '', itens: [], pagamentos: [], comprovantes: [], lancado: false
   });
   const [isLoading, setIsLoading] = useState(true);
+  const [filtroLancado, setFiltroLancado] = useState('todos');
 
   // Import State
   const [importData, setImportData] = useState([]);
@@ -155,6 +156,7 @@ export default function DespesasPage() {
           totalDespesa: item.totalDespesa,
           totalPago: item.totalPago,
           status: item.status,
+          lancado: false,
           itens: itensList,
           pagamentos: pagamentosList,
           comprovantes: [],
@@ -307,7 +309,7 @@ export default function DespesasPage() {
       setFormData({ ...despesa });
       setCurrentDespesa(despesa);
     } else {
-      setFormData({ cpfCnpj: '', nomeFornecedor: '', dataContratacao: '', itens: [], pagamentos: [], comprovantes: [] });
+      setFormData({ cpfCnpj: '', nomeFornecedor: '', dataContratacao: '', itens: [], pagamentos: [], comprovantes: [], lancado: false });
       setCurrentDespesa(null);
     }
     setErrors({});
@@ -376,6 +378,7 @@ export default function DespesasPage() {
       totalDespesa: tDespesa,
       totalPago: tPago,
       status: novoStatus,
+      lancado: formData.lancado || false,
       updatedAt: serverTimestamp()
     };
 
@@ -504,11 +507,29 @@ export default function DespesasPage() {
     }));
   };
 
-  const totalGeral = despesas.reduce((acc, curr) => acc + curr.totalDespesa, 0);
-  const totalGeralPago = despesas.reduce((acc, curr) => acc + curr.totalPago, 0);
+  const handleToggleLancado = async (despesa) => {
+    try {
+      await updateDoc(doc(db, 'despesas', despesa.id), {
+        lancado: !despesa.lancado,
+        updatedAt: serverTimestamp()
+      });
+    } catch (err) {
+      console.error('Erro ao atualizar status de lançamento:', err);
+      addToast('Erro ao atualizar status', 'error');
+    }
+  };
+
+  const filteredDespesas = despesas.filter(d => {
+    if (filtroLancado === 'sim') return d.lancado === true;
+    if (filtroLancado === 'nao') return !d.lancado;
+    return true;
+  });
+
+  const totalGeral = filteredDespesas.reduce((acc, curr) => acc + curr.totalDespesa, 0);
+  const totalGeralPago = filteredDespesas.reduce((acc, curr) => acc + curr.totalPago, 0);
   const totalGeralPendente = totalGeral - totalGeralPago;
 
-  const dataWithActions = despesas.map(d => {
+  const dataWithActions = filteredDespesas.map(d => {
     const hasAnexo = Boolean(d.comprovantes && d.comprovantes.length > 0);
     return {
       ...d,
@@ -519,6 +540,14 @@ export default function DespesasPage() {
         <Badge variant={hasAnexo ? 'info' : 'neutral'} size="sm">
           {hasAnexo ? '📎 Com anexo' : 'Sem anexo'}
         </Badge>
+      ),
+      lancadoCheck: (
+        <input 
+          type="checkbox" 
+          checked={!!d.lancado} 
+          onChange={() => handleToggleLancado(d)} 
+          style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+        />
       ),
       actions: (
         <div className="action-buttons">
@@ -552,6 +581,19 @@ export default function DespesasPage() {
             <StatsCard title="Total Pendente" value={formatCurrency(totalGeralPendente)} />
           </div>
 
+          <div className="filter-bar" style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
+            <Input placeholder="Buscar por fornecedor..." style={{ flex: 1 }} />
+            <select 
+              value={filtroLancado} 
+              onChange={(e) => setFiltroLancado(e.target.value)}
+              className="ui-input"
+            >
+              <option value="todos">Todos (Lançamento)</option>
+              <option value="sim">Lançados</option>
+              <option value="nao">Não Lançados</option>
+            </select>
+          </div>
+
           <DataTable 
             columns={[
               { key: 'dataContratacao', label: 'Data' },
@@ -561,6 +603,7 @@ export default function DespesasPage() {
               { key: 'pagoFormatado', label: 'Pago' },
               { key: 'statusBadge', label: 'Status' },
               { key: 'anexoBadge', label: 'Anexo' },
+              { key: 'lancadoCheck', label: 'Lançado' },
               { key: 'actions', label: 'Ações' }
             ]} 
             data={dataWithActions} 
@@ -644,6 +687,15 @@ export default function DespesasPage() {
               />
               <Input label="Fornecedor / Razão Social" value={formData.nomeFornecedor} onChange={(e) => setFormData({...formData, nomeFornecedor: e.target.value})} required />
               <MaskedInput mask="date" label="Data de Contratação" value={formData.dataContratacao} onChange={(e) => setFormData({...formData, dataContratacao: e.target.value})} />
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', gridColumn: '1 / -1', cursor: 'pointer', marginTop: '10px' }}>
+                <input 
+                  type="checkbox" 
+                  checked={formData.lancado || false} 
+                  onChange={(e) => setFormData({...formData, lancado: e.target.checked})} 
+                  style={{ width: '18px', height: '18px' }}
+                />
+                Marcar como Lançado
+              </label>
             </div>
 
             <div className="bordered-card">
@@ -739,6 +791,7 @@ export default function DespesasPage() {
                 <p><strong>Fornecedor:</strong> {currentDespesa.nomeFornecedor} ({currentDespesa.cpfCnpj})</p>
                 <p><strong>Data:</strong> {currentDespesa.dataContratacao}</p>
                 <p><strong>Status:</strong> {currentDespesa.status?.toUpperCase()}</p>
+                <p><strong>Lançado:</strong> {currentDespesa.lancado ? 'Sim' : 'Não'}</p>
               </div>
               <div className="mt-4">
                 <h4>Itens</h4>
