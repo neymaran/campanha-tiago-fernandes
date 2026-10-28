@@ -27,11 +27,13 @@ export async function downloadAttachmentsZip(groups, zipName) {
       try {
         let blob;
         try {
-          blob = await getBlob(ref(storage, `${group.basePath}/${file.name}`));
-        } catch {
-          const res = await fetch(file.url);
+          // 1º: via proxy do próprio site (não depende de CORS no bucket)
+          const res = await fetch(`/api/anexo?url=${encodeURIComponent(file.url)}`);
           if (!res.ok) throw new Error(res.statusText);
           blob = await res.blob();
+        } catch {
+          // 2º: direto do Storage (funciona se o CORS do bucket estiver configurado)
+          blob = await getBlob(ref(storage, `${group.basePath}/${file.name}`));
         }
         folder.file(sanitize(file.name), blob);
         total++;
