@@ -9,6 +9,7 @@ import { ref, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebas
 import { db, storage } from '../../services/firebase';
 import { formatCurrency, parseCurrency, validateCPF } from '../../utils/formatters';
 import * as XLSX from 'xlsx';
+import { downloadAttachmentsZip } from '../../utils/downloadZip';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import './DoacoesPage.css';
@@ -461,6 +462,26 @@ export default function DoacoesPage() {
     doc.save('relatorio-doacoes.pdf');
   };
 
+  const [isZipping, setIsZipping] = useState(false);
+  const handleDownloadZip = async () => {
+    const groups = filteredDoacoes
+      .filter(d => d.identidades && d.identidades.length > 0)
+      .map(d => ({ folder: `${d.data || 'sem-data'} - ${d.nomeDoador || d.id}`, basePath: `identidades/${d.id}`, files: d.identidades }));
+    if (groups.length === 0) { addToast('Nenhum anexo encontrado nos registros listados.', 'warning'); return; }
+    setIsZipping(true);
+    try {
+      const { total, falhas } = await downloadAttachmentsZip(groups, 'anexos-doacoes.zip');
+      if (total === 0) addToast('Não foi possível baixar os anexos.', 'error');
+      else if (falhas > 0) addToast(`${total} anexo(s) baixado(s); ${falhas} falharam.`, 'warning');
+      else addToast(`${total} anexo(s) baixado(s) com sucesso.`, 'success');
+    } catch (e) {
+      console.error(e);
+      addToast('Erro ao gerar o arquivo .zip.', 'error');
+    } finally {
+      setIsZipping(false);
+    }
+  };
+
   const dataWithActions = filteredDoacoes.map(d => {
     const hasAnexo = Boolean(d.identidades && d.identidades.length > 0);
     return {
@@ -498,6 +519,7 @@ export default function DoacoesPage() {
             actions={
               <div style={{ display: 'flex', gap: '8px' }}>
                 <Button variant="outline" onClick={handleExportPDF}>Exportar PDF</Button>
+                <Button variant="outline" onClick={handleDownloadZip} isLoading={isZipping} disabled={isZipping}>{isZipping ? 'Gerando .zip...' : '📦 Baixar Anexos (.zip)'}</Button>
                 <Button variant="outline" onClick={() => {
                   setImportData([]); setImportErrors([]); setViewMode('import'); window.scrollTo(0, 0);
                 }}>Importar Planilha</Button>
